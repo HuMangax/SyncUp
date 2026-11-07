@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --background: #faf9f7;
+  --foreground: #1c1b22;
+  --card: #ffffff;
+  --muted: #6b6a76;
+  --border: #e8e6e1;
+  --accent: #4f46e5;
+  --accent-soft: #eef0ff;
+  --danger: #b42318;
+  --warn: #92600a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+/* Non-color cue: class/work/social blocks are hatched, study blocks are solid. */
+.hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(0 0 0 / 0.07) 0,
+    rgb(0 0 0 / 0.07) 4px,
+    transparent 4px,
+    transparent 9px
+  );
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

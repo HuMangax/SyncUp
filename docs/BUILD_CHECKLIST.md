@@ -4,16 +4,16 @@ Phases are ordered by gates, not hours. Do not start a phase until the previous 
 
 ## Phase 1: Foundation
 
-- [ ] Scaffold Next.js (App Router, TypeScript strict), Tailwind, shadcn/ui, Vitest, zod, Zustand, luxon
-- [ ] `lib/types.ts` with all entities, `Plan`, `Proposal`, `Diff`, `Warning`
-- [ ] `lib/time/slots.ts` (15-minute grid, UTC <-> local, DST-safe)
-- [ ] `CalendarProvider` interface and simulated provider with weekly recurrence
-- [ ] `lib/demo/seed.ts` with dates as offsets from the demo anchor
-- [ ] Zustand store (plan, proposals, snapshots, simulated clock)
-- [ ] App shell: sidebar (desktop), bottom tabs (mobile)
-- [ ] Calendar page renders the seeded week; personal events and study sessions styled differently
+- [x] Scaffold Next.js (App Router, TypeScript strict), Tailwind, shadcn/ui, Vitest, zod, Zustand, luxon
+- [x] `lib/types.ts` with all entities, `Plan`, `Proposal`, `Diff`, `Warning`
+- [x] `lib/time/slots.ts` (15-minute grid, UTC <-> local, DST-safe)
+- [x] `CalendarProvider` interface and simulated provider with weekly recurrence
+- [x] `lib/demo/seed.ts` with dates as offsets from the demo anchor
+- [x] Zustand store (plan, proposals, snapshots, simulated clock)
+- [x] App shell: sidebar (desktop), bottom tabs (mobile)
+- [x] Calendar page renders the seeded week; personal events and study sessions styled differently
 
-**Gate 1:** seeded week renders on the Calendar page.
+**Gate 1:** seeded week renders on the Calendar page. (All routes build and return 200; visual check in a browser at 1440 px and 390 px still to do. shadcn/ui is not initialised yet: components are hand-written with Tailwind and added as needed.)
 
 ## Phase 2: Scheduler core
 
