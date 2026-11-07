@@ -144,32 +144,7 @@ export function createSeed(anchorDate: string, zone = DEMO_ZONE): SeedData {
     assignments,
     subtasks: [],
     events,
-    // Phase 1 only: placeholder sessions so the calendar can show the study-session style.
-    // Phase 2 replaces these with the real scheduler output (the store starts with no sessions).
+    // No plan yet: the student presses "Generate plan" (presenter step 3).
     sessions: [],
   };
-}
-
-/**
- * Phase-1 placeholder study sessions, offsets from the anchor. Used by the store's
- * "sample sessions" fallback until the scheduler exists.
- */
-export function placeholderSessions(anchor: string, zone = DEMO_ZONE): StudySession[] {
-  const mk = (id: string, assignment_id: string, day: number, s: string, e: string): StudySession => ({
-    id,
-    assignment_id,
-    subtask_id: null,
-    start_at: localToUtc(addDays(anchor, day), s, zone),
-    end_at: localToUtc(addDays(anchor, day), e, zone),
-    status: "scheduled",
-    minutes_done: 0,
-    pinned: false,
-    plan_version: 0,
-  });
-  return [
-    mk("s-ph-1", "a-marketing", 0, "18:30", "20:00"),
-    mk("s-ph-2", "a-stats", 1, "19:00", "20:30"),
-    mk("s-ph-3", "a-operations", 2, "19:00", "20:30"),
-    mk("s-ph-4", "a-stats", 4, "19:00", "21:00"),
-  ];
 }

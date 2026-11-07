@@ -13,17 +13,17 @@ Phases are ordered by gates, not hours. Do not start a phase until the previous 
 - [x] App shell: sidebar (desktop), bottom tabs (mobile)
 - [x] Calendar page renders the seeded week; personal events and study sessions styled differently
 
-**Gate 1:** seeded week renders on the Calendar page. (All routes build and return 200; visual check in a browser at 1440 px and 390 px still to do. shadcn/ui is not initialised yet: components are hand-written with Tailwind and added as needed.)
+**Gate 1:** seeded week renders on the Calendar page. (All routes build and return 200; checked in headless Chrome at 1440 px and 390 px, no console errors. shadcn/ui is not initialised yet: components are hand-written with Tailwind and added as needed.)
 
 ## Phase 2: Scheduler core
 
-- [ ] `availability.ts`: free-slot grid (sleep window incl. midnight crossing, events + buffers, free days, locked/pinned, past)
-- [ ] `pace.ts`: daily quotas with carryover, EDF ordering with priority/difficulty tie-breaks, exam cap and spacing
-- [ ] `place.ts`: preferred windows first, session splitting, breaks, subtask queue
-- [ ] `index.ts`: `schedule(state, now) -> Plan`
-- [ ] Vitest: no overlap, deadlines respected, daily limit, sleep and free days, minimum session, determinism, subtask order, exam spacing, performance under 200 ms
+- [x] `availability.ts`: free-slot grid (sleep window incl. midnight crossing, events + buffers, free days, locked/pinned, past)
+- [x] `pace.ts`: daily quotas with carryover, EDF ordering with priority/difficulty tie-breaks, exam cap and spacing
+- [x] `place.ts`: preferred windows first, session splitting, breaks, subtask queue
+- [x] `index.ts`: `schedule(state, now) -> Plan`
+- [x] Vitest: no overlap, deadlines respected, daily limit, sleep and free days, minimum session, determinism, subtask order, exam spacing, performance under 200 ms
 
-**Gate 2:** all scheduler tests pass; same output on every run.
+**Gate 2:** all scheduler tests pass; same output on every run. (25 tests green; "Generate plan" renders the opening plan in ~100 ms.)
 
 ## Phase 3: Progress loop
 

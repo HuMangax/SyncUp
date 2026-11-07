@@ -38,7 +38,8 @@ function minutesInDay(iso: string, zone: string, dayKey: string, edge: "start" |
 }
 
 export function WeekGrid() {
-  const { now, events, sessions, assignments, settings } = usePlanner();
+  const { now, events, sessions, assignments, settings, unplaced, generatePlan } = usePlanner();
+  const hasPlan = sessions.some((s) => s.status === "scheduled");
   const zone = settings.timezone;
   const todayKey = localDateKey(now, zone);
   const [weekStart, setWeekStart] = useState(() => mondayOnOrBefore(todayKey));
@@ -133,7 +134,7 @@ export function WeekGrid() {
   const gutter = (
     <div className="relative" style={{ height: hours.length * HOUR_H }}>
       {hours.map((h, i) => (
-        <div key={h} className="absolute right-1 -translate-y-1.5 text-[10px] text-muted" style={{ top: i * HOUR_H }}>
+        <div key={h} className={`absolute right-1 text-[10px] text-muted ${i === 0 ? "translate-y-0.5" : "-translate-y-1.5"}`} style={{ top: i * HOUR_H }}>
           {DateTime.fromObject({ hour: h }).toFormat("h a")}
         </div>
       ))}
@@ -144,6 +145,14 @@ export function WeekGrid() {
     <div className="mb-3 flex items-center justify-between">
       <h1 className="text-xl font-semibold tracking-tight">Calendar</h1>
       <div className="flex items-center gap-1">
+        {!hasPlan && (
+          <button
+            onClick={generatePlan}
+            className="mr-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+          >
+            Generate plan
+          </button>
+        )}
         <button aria-label="Previous week" className="rounded-lg border border-border bg-card p-1.5" onClick={() => setWeekStart(addDays(weekStart, -7))}><ChevronLeft size={16} /></button>
         <span className="hidden px-2 text-sm text-muted md:inline">{rangeLabel}</span>
         <button aria-label="Next week" className="rounded-lg border border-border bg-card p-1.5" onClick={() => setWeekStart(addDays(weekStart, 7))}><ChevronRight size={16} /></button>
@@ -161,10 +170,18 @@ export function WeekGrid() {
     </ul>
   );
 
+  const short = Object.entries(unplaced);
+
   return (
     <div>
       {nav}
       {legend}
+      {short.length > 0 && (
+        <div role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          Not enough time before the deadline:{" "}
+          {short.map(([id, h]) => `${assignments.find((a) => a.id === id)?.title ?? id} is ${h} h short`).join("; ")}.
+        </div>
+      )}
 
       {/* Desktop: full week */}
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-card md:block">
@@ -172,7 +189,7 @@ export function WeekGrid() {
           <div />
           {days.map(header)}
         </div>
-        <div className="grid max-h-[calc(100vh-14rem)] overflow-y-auto" style={{ gridTemplateColumns: "48px repeat(7, minmax(0, 1fr))" }}>
+        <div className="grid max-h-[calc(100vh-9.5rem)] overflow-y-auto" style={{ gridTemplateColumns: "48px repeat(7, minmax(0, 1fr))" }}>
           {gutter}
           {days.map(renderCol)}
         </div>

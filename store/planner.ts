@@ -11,7 +11,10 @@ import type {
   Subtask,
   UserSettings,
 } from "@/lib/types";
-import { createSeed, demoAnchorFor, placeholderSessions } from "@/lib/demo/seed";
+import { createSeed, demoAnchorFor } from "@/lib/demo/seed";
+import { schedule, isLocked } from "@/lib/scheduler";
+import { toPlannerState } from "@/lib/planner";
+import { slotCeil } from "@/lib/time/slots";
 
 export type PlannerStore = {
   anchor: string;
@@ -26,11 +29,16 @@ export type PlannerStore = {
   proposals: Proposal[];
   snapshots: PlanSnapshot[];
 
+  /** Unplaced hours per assignment from the last generated plan. */
+  unplaced: Record<string, number>;
+
   reset: () => void;
   advanceClock: (hours: number) => void;
+  /** First plan only (no current plan to diff against). Later changes go through proposals. */
+  generatePlan: () => void;
 };
 
-const initial = (): Omit<PlannerStore, "reset" | "advanceClock"> => {
+const initial = (): Omit<PlannerStore, "reset" | "advanceClock" | "generatePlan"> => {
   const anchor = demoAnchorFor(new Date().toISOString());
   const seed = createSeed(anchor);
   return {
@@ -40,24 +48,32 @@ const initial = (): Omit<PlannerStore, "reset" | "advanceClock"> => {
     assignments: seed.assignments,
     subtasks: seed.subtasks,
     events: seed.events,
-    // Phase 1 placeholder; replaced by schedule() in phase 2.
-    sessions: placeholderSessions(seed.anchor, seed.settings.timezone),
+    sessions: seed.sessions,
     planVersion: 1,
     proposals: [],
     snapshots: [],
+    unplaced: {},
   };
 };
 
 export const usePlanner = create<PlannerStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initial(),
+      generatePlan: () => {
+        const s = get();
+        const plan = schedule(toPlannerState(s, s.now), s.now);
+        // Keep history and locked sessions; only future movable sessions are replaced.
+        const nowSlot = slotCeil(s.now);
+        const kept = s.sessions.filter((x) => !(x.status === "scheduled" && !isLocked(x, nowSlot)));
+        set({ sessions: [...kept, ...plan.sessions], unplaced: plan.unplaced, planVersion: s.planVersion + 1 });
+      },
       reset: () => set(initial()),
       advanceClock: (hours) =>
         set((s) => ({ now: new Date(Date.parse(s.now) + hours * 3_600_000).toISOString() })),
     }),
     {
-      name: "adaptive-planner-v1",
+      name: "adaptive-planner-v2",
       storage: createJSONStorage(() => localStorage),
       // Rehydrated on the client after mount to avoid SSR hydration mismatches.
       skipHydration: true,
