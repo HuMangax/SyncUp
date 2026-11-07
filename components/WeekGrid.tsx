@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import { Briefcase, BookOpen, ChevronLeft, ChevronRight, Flag, Heart, Pencil, Pin } from "lucide-react";
 import { usePlanner } from "@/store/planner";
+import { SessionDialog } from "./SessionDialog";
+import { Warnings } from "./Warnings";
 import { expandEvents } from "@/lib/calendar/simulated";
 import { addDays, localDateKey, localToUtc, mondayOnOrBefore } from "@/lib/time/slots";
 import type { EventKind, EventOccurrence, StudySession } from "@/lib/types";
@@ -28,6 +30,7 @@ type Block = {
   kind: "study" | EventKind;
   pinned?: boolean;
   status?: string;
+  sessionId?: string;
 };
 
 function minutesInDay(iso: string, zone: string, dayKey: string, edge: "start" | "end"): number {
@@ -38,7 +41,8 @@ function minutesInDay(iso: string, zone: string, dayKey: string, edge: "start" |
 }
 
 export function WeekGrid() {
-  const { now, events, sessions, assignments, settings, unplaced, generatePlan } = usePlanner();
+  const { now, events, sessions, assignments, settings, warnings, generatePlan } = usePlanner();
+  const [openSession, setOpenSession] = useState<string | null>(null);
   const hasPlan = sessions.some((s) => s.status === "scheduled");
   const zone = settings.timezone;
   const todayKey = localDateKey(now, zone);
@@ -78,7 +82,7 @@ export function WeekGrid() {
       .filter((s: StudySession) => s.status !== "cancelled")
       .forEach((s) => {
         const c = clip(s.start_at, s.end_at);
-        if (c) out.push({ key: s.id, top: c.top, height: c.height, title: titleOf(s.assignment_id), sub: `${fmt(s.start_at)} – ${fmt(s.end_at)}`, kind: "study", pinned: s.pinned, status: s.status });
+        if (c) out.push({ key: s.id, top: c.top, height: c.height, title: titleOf(s.assignment_id), sub: `${fmt(s.start_at)} – ${fmt(s.end_at)}`, kind: "study", pinned: s.pinned, status: s.status, sessionId: s.id });
       });
     return out;
   };
@@ -99,21 +103,34 @@ export function WeekGrid() {
         const study = b.kind === "study";
         const style = study ? null : KIND_STYLE[b.kind as EventKind];
         const Icon = study ? Pencil : style!.Icon;
-        return (
-          <div
-            key={b.key}
-            title={`${b.title} · ${b.sub}`}
-            className={`absolute inset-x-0.5 overflow-hidden rounded-md border-l-4 px-1.5 py-0.5 text-[11px] leading-tight ${
-              study ? "border-indigo-800 bg-indigo-600 text-white shadow-sm" : `${style!.cls} hatch`
-            } ${b.status === "missed" ? "opacity-50 line-through" : ""}`}
-            style={{ top: b.top, height: b.height }}
-          >
+        const cls = `absolute inset-x-0.5 overflow-hidden rounded-md border-l-4 px-1.5 py-0.5 text-left text-[11px] leading-tight ${
+          study ? "border-indigo-800 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" : `${style!.cls} hatch`
+        } ${b.status === "missed" ? "opacity-50 line-through" : ""} ${b.status === "completed" ? "bg-indigo-400" : ""}`;
+        const body = (
+          <>
             <div className="flex items-center gap-1 font-semibold">
               <Icon size={11} aria-hidden />
               <span className="truncate">{b.title}</span>
               {b.pinned && <Pin size={10} aria-label="Pinned" />}
+              {b.status && b.status !== "scheduled" && <span className="sr-only">({b.status})</span>}
             </div>
             {b.height > 30 && <div className="truncate opacity-90">{b.sub}</div>}
+          </>
+        );
+        return study ? (
+          <button
+            key={b.key}
+            title={`${b.title} · ${b.sub}`}
+            aria-label={`${b.title}, ${b.sub}${b.status && b.status !== "scheduled" ? `, ${b.status}` : ""}. Update session`}
+            className={cls}
+            style={{ top: b.top, height: b.height }}
+            onClick={() => setOpenSession(b.sessionId!)}
+          >
+            {body}
+          </button>
+        ) : (
+          <div key={b.key} title={`${b.title} · ${b.sub}`} className={cls} style={{ top: b.top, height: b.height }}>
+            {body}
           </div>
         );
       })}
@@ -170,18 +187,14 @@ export function WeekGrid() {
     </ul>
   );
 
-  const short = Object.entries(unplaced);
-
   return (
     <div>
       {nav}
       {legend}
-      {short.length > 0 && (
-        <div role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          Not enough time before the deadline:{" "}
-          {short.map(([id, h]) => `${assignments.find((a) => a.id === id)?.title ?? id} is ${h} h short`).join("; ")}.
-        </div>
-      )}
+      <div className="mb-3">
+        <Warnings warnings={warnings} compact />
+      </div>
+      {openSession && <SessionDialog sessionId={openSession} onClose={() => setOpenSession(null)} />}
 
       {/* Desktop: full week */}
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-card md:block">

@@ -4,6 +4,17 @@ import { block, isFree, type Day, type Grid } from "./availability";
 
 export type Placed = { assignment_id: string; start: Slot; end: Slot };
 
+/**
+ * Soft preference for the current plan: each assignment's existing (movable) slots, and which
+ * assignment holds each slot. Never overrides a hard limit; only orders the choice of free slots.
+ */
+export type Hints = {
+  /** Assignment index holding each slot (index = slot - g.h0), -1 for none. */
+  owner: Int32Array;
+  index: Map<string, number>;
+  ranges: Map<string, [Slot, Slot][]>;
+};
+
 export type SessionLimits = { min: number; target: number; max: number; brk: number };
 
 export const limitsOf = (s: UserSettings): SessionLimits => ({
@@ -28,8 +39,9 @@ export function sessionLength(remaining: number, runLen: number, L: SessionLimit
 
 /**
  * Step 3: place up to `take` slots of one item on one day, before `deadline`.
- * Pass A uses preferred windows only; pass B uses any other waking free time. Both first look
- * for a run that fits a whole session, and only then fall back to shorter fragments.
+ * The assignment's own slots from the current plan come first (stability). Then pass A uses
+ * preferred windows and pass B any other waking free time; both first look for a run that fits a
+ * whole session, and only then fall back to shorter fragments.
  * Reserves a break after each session. Returns the placed sessions.
  */
 export function placeInDay(
@@ -40,6 +52,7 @@ export function placeInDay(
   deadline: Slot,
   settings: UserSettings,
   L: SessionLimits,
+  hints?: Hints,
 ): Placed[] {
   const lo = Math.max(day.start, g.h0);
   const hi = Math.min(day.end, deadline, g.h1);
@@ -51,26 +64,41 @@ export function placeInDay(
     .filter(([a, b]) => b - a >= L.min)
     .sort((x, y) => x[0] - y[0]);
   const anywhere: [Slot, Slot][] = [[lo, hi]];
-  // Whole sessions first (preferred, then any waking time); only then accept shorter fragments.
-  const passes: { ranges: [Slot, Slot][]; whole: boolean }[] = [
-    { ranges: preferred, whole: true },
-    { ranges: anywhere, whole: true },
-    { ranges: preferred, whole: false },
-    { ranges: anywhere, whole: false },
-  ];
+  const own = (hints?.ranges.get(assignmentId) ?? [])
+    .map(([a, b]) => clip(a, b))
+    .filter(([a, b]) => b - a >= L.min);
+  const me = hints?.index.get(assignmentId) ?? -2;
+  const foreign = (t: Slot) => {
+    if (!hints) return false;
+    const o = hints.owner[t - g.h0];
+    return o >= 0 && o !== me;
+  };
+  // Own current slots first; then whole sessions (preferred, then any waking time), then fragments.
+  // Slots another assignment holds in the current plan are used only when nothing else fits.
+  type Pass = { ranges: [Slot, Slot][]; whole: boolean; avoid: boolean };
+  const passes: Pass[] = [{ ranges: own, whole: false, avoid: false }];
+  for (const avoid of hints ? [true, false] : [false]) {
+    passes.push(
+      { ranges: preferred, whole: true, avoid },
+      { ranges: anywhere, whole: true, avoid },
+      { ranges: preferred, whole: false, avoid },
+      { ranges: anywhere, whole: false, avoid },
+    );
+  }
 
   const out: Placed[] = [];
   let remaining = take;
-  for (const { ranges, whole } of passes) {
+  for (const { ranges, whole, avoid } of passes) {
+    const ok = (t: Slot) => isFree(g, t) && !(avoid && foreign(t));
     for (const [a, b] of ranges) {
       let t = a;
       while (remaining >= L.min && t < b) {
-        if (!isFree(g, t)) {
+        if (!ok(t)) {
           t++;
           continue;
         }
         let r = t;
-        while (r < b && isFree(g, r)) r++;
+        while (r < b && ok(r)) r++;
         const run = r - t;
         const wanted = sessionLength(remaining, Number.POSITIVE_INFINITY, L);
         if (run < L.min || (whole && run < wanted)) {

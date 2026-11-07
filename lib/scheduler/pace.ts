@@ -1,7 +1,8 @@
 import type { Assignment, AssignmentType, Level, Slot, UserSettings } from "@/lib/types";
 import { hoursToSlots, slotFloor, SLOTS_PER_HOUR } from "@/lib/time/slots";
+import { remainingHours } from "@/lib/progress/remaining";
 import { countFree, type Grid } from "./availability";
-import { placeInDay, type Placed, type SessionLimits } from "./place";
+import { placeInDay, type Hints, type Placed, type SessionLimits } from "./place";
 
 export const LEAD_HOURS: Record<AssignmentType, number> = { assignment: 3, project: 6, exam: 12 };
 export const DIFFICULTY_PAD: Record<Level, number> = { 1: 1.0, 2: 1.1, 3: 1.2 };
@@ -10,12 +11,6 @@ export const EXAM_DAILY_CAP_SLOTS = 3 * SLOTS_PER_HOUR;
 export const effectiveDeadlineSlot = (a: Assignment): Slot =>
   slotFloor(new Date(Date.parse(a.due_at) - LEAD_HOURS[a.type] * 3_600_000).toISOString());
 
-/** Unpadded remaining hours: override wins, else estimate x (1 - percent). */
-export function remainingHours(a: Assignment): number {
-  if (a.status === "completed") return 0;
-  const r = a.remaining_override ?? a.estimate_hours * (1 - a.percent_complete / 100);
-  return Math.max(0, r);
-}
 
 /** Remaining hours padded by difficulty (x1.0 / x1.1 / x1.2). */
 export const paddedRemainingHours = (a: Assignment): number => remainingHours(a) * DIFFICULTY_PAD[a.difficulty];
@@ -55,6 +50,7 @@ export function pace(
   mode: SortMode,
   settings: UserSettings,
   L: SessionLimits,
+  hints?: Hints,
 ): Placed[] {
   const maxDay = hoursToSlots(settings.max_hours_per_day);
   const order = [...items].sort(cmp(mode));
@@ -86,7 +82,7 @@ export function pace(
       else take = it.need - L.min;
     }
     if (take < L.min) return;
-    const placed = placeInDay(g, g.days[i], it.a.id, take, it.deadline, settings, L);
+    const placed = placeInDay(g, g.days[i], it.a.id, take, it.deadline, settings, L, hints);
     const n = placed.reduce((s, p) => s + (p.end - p.start), 0);
     g.days[i].usedSlots += n;
     it.need -= n;

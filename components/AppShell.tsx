@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CalendarDays, ClipboardList, GitCompareArrows, LayoutDashboard, Settings } from "lucide-react";
-import { usePlanner } from "@/store/planner";
+import { pendingProposal, usePlanner } from "@/store/planner";
+import { DemoPanel } from "./DemoPanel";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -17,6 +18,8 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
+  const pending = usePlanner((s) => pendingProposal(s.proposals));
+  const changed = pending ? pending.diff.filter((e) => e.kind !== "kept").length : 0;
 
   useEffect(() => {
     void Promise.resolve(usePlanner.persist.rehydrate()).then(() => setReady(true));
@@ -48,8 +51,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1 px-4 pb-24 pt-5 md:px-8 md:pb-8">
+        {ready && pending && pathname !== "/preview" && (
+          <Link
+            href="/preview"
+            className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-accent-soft px-4 py-2.5 text-sm text-indigo-950 hover:bg-indigo-100"
+          >
+            <span>
+              <span className="font-semibold">Your plan has updates to review.</span>{" "}
+              {changed === 0 ? "Nothing needs to move." : `${changed} session${changed === 1 ? "" : "s"} would change.`}
+            </span>
+            <span className="shrink-0 font-semibold text-accent">Review →</span>
+          </Link>
+        )}
         {ready ? children : <div className="text-sm text-muted">Loading your week…</div>}
       </main>
+
+      {ready && <DemoPanel />}
 
       <nav
         aria-label="Main"

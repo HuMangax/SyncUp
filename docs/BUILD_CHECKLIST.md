@@ -27,16 +27,16 @@ Phases are ordered by gates, not hours. Do not start a phase until the previous 
 
 ## Phase 3: Progress loop
 
-- [ ] `progress/remaining.ts` (percent vs override, missed returns hours, partial credits minutes)
-- [ ] `progress/diff.ts` with stability pass and reason codes
-- [ ] `feasibility/check.ts`: cumulative shortfall, warning kinds, shortage mode, what-if suggestions
-- [ ] Proposal create / accept / reject / supersede; plan snapshots and one-step undo
-- [ ] Session status controls (done, partial with minutes, missed, pin) trigger proposals
-- [ ] Assignment percent / remaining-hours control triggers proposals
-- [ ] Rescheduling Preview page: kept, moved, added, removed, reasons, risk per assignment
-- [ ] Tests: locked sessions unchanged, no-op proposal all kept, accept then undo restores plan, infeasible case
+- [x] `progress/remaining.ts` (percent vs override, missed returns hours, partial credits minutes)
+- [x] `progress/diff.ts` with stability pass and reason codes
+- [x] `feasibility/check.ts`: cumulative shortfall, warning kinds, shortage mode, what-if suggestions
+- [x] Proposal create / accept / reject / supersede; plan snapshots and one-step undo
+- [x] Session status controls (done, partial with minutes, missed, pin) trigger proposals
+- [x] Assignment percent / remaining-hours control triggers proposals
+- [x] Rescheduling Preview page: kept, moved, added, removed, reasons, risk per assignment
+- [x] Tests: locked sessions unchanged, no-op proposal all kept, accept then undo restores plan, infeasible case
 
-**Gate 3:** presenter steps 1 to 9 run end to end.
+**Gate 3:** presenter steps 1 to 9 run end to end. (Scripted in headless Chrome at 1440 px and 390 px: no console errors, accept-to-calendar in ~60 ms, red warning after Squeeze week, suggestion clears it, undo restores it.)
 
 ## Phase 4: Demo polish
 

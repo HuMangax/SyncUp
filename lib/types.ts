@@ -193,6 +193,16 @@ export type PlannerState = {
   plan_version: number;
 };
 
+/** The stored, accepted state that proposals are built from. */
+export type PlanData = {
+  settings: UserSettings;
+  assignments: Assignment[];
+  subtasks: Subtask[];
+  sessions: StudySession[];
+  events: CalendarEvent[];
+  planVersion: number;
+};
+
 // ---------- Proposals / Diff ----------
 
 export type ReasonCode =
@@ -240,6 +250,8 @@ export type Proposal = {
   id: string;
   created_at: ISO;
   trigger: ProposalTrigger;
+  /** Triggers of pending proposals this one superseded, newest first. Their effects are included. */
+  prior_triggers: ProposalTrigger[];
   base_version: number;
   new_sessions: StudySession[];
   diff: DiffEntry[];

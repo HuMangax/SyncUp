@@ -4,6 +4,15 @@ Record choices made where the spec or design was ambiguous, and anything left un
 
 | Date | Decision | Why |
 | --- | --- | --- |
+| 2026-11-07 | The scheduler uses the current plan's movable sessions as soft hints: an assignment tries its own old slots first and avoids slots other assignments hold | A from-scratch replan reshuffled unrelated assignments after one missed session. Hints only order the choice of free slots; hard limits are unchanged |
+| 2026-11-07 | A session marked missed keeps its time blocked in later replans | The student said they could not use that time; otherwise the work went straight back into the same slot |
+| 2026-11-07 | A superseding proposal carries the triggers of the pending ones it replaced (`prior_triggers`) | Presenter steps 4 and 5 happen before review; the Preview lists both and keeps the missed-session reason |
+| 2026-11-07 | Diff pairs same-day sessions first; reasons follow the change direction (shorter = AHEAD_PACE, returned missed time = MISSED_RETURNED, longer/added = BEHIND_PACE) | Plain time-order pairing produced misleading reasons |
+| 2026-11-07 | Pinning applies immediately without a proposal; marking a session done/partial/missed and progress edits record the fact immediately and propose the schedule change | Pinning moves nothing else. Facts are facts; only the schedule needs review. Reject keeps the old plan |
+| 2026-11-07 | Undo restores the plan sessions (and assignment progress) from the snapshot taken at accept; settings and calendar changes are not undone | One-step undo of the plan, per the design |
+| 2026-11-07 | Overloaded-day warnings are folded into one warning listing the days | Squeeze week produced 14 near-identical warnings |
+| 2026-11-07 | Squeeze week = daily max 1.5 h plus Wed/Fri evening shifts for two weeks | A 2 h max still fit all work; 1.5 h makes Marketing 4.75 h short, and "raise daily max" recovers all of it |
+| 2026-11-07 | "Show first open slots" suggestion not implemented | The other four what-ifs cover the demo; can add later |
 | 2026-11-07 | Daily capacity is `min(max_hours - locked, free)` rather than `min(max_hours, free) - locked` | Free hours already exclude locked slots, so subtracting them again would double-count |
 | 2026-11-07 | Pacing quota is at least one target-length session (`max(ceil(need / days_left), target)`) | Pure even spreading produced many 30-45 min fragments across three assignments. Front-loading leaves slack before deadlines |
 | 2026-11-07 | Placement tries whole-session runs (preferred window, then any waking time) before short fragments | Otherwise leftover 30-min scraps of the evening window beat a free 90-min daytime block |

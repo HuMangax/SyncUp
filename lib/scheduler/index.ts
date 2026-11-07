@@ -1,10 +1,11 @@
 import type { DayLoad, Plan, PlannerState, StudySession } from "@/lib/types";
 import { slotCeil, slotFloor, slotsToHours, slotToIso, roundUpToSlots, SLOTS_PER_HOUR } from "@/lib/time/slots";
-import { buildGrid, lockedSessions } from "./availability";
+import { buildGrid, isLocked, lockedSessions, type Grid } from "./availability";
 import { effectiveDeadlineSlot, examCapFor, pace, paddedRemainingHours, type Item, type SortMode } from "./pace";
-import { limitsOf, type Placed } from "./place";
+import { limitsOf, type Hints, type Placed } from "./place";
 
-export { effectiveDeadlineSlot, paddedRemainingHours, remainingHours } from "./pace";
+export { effectiveDeadlineSlot, paddedRemainingHours } from "./pace";
+export { remainingHours } from "@/lib/progress/remaining";
 export { isLocked, lockedSessions } from "./availability";
 
 const HORIZON_DAYS = 28;
@@ -41,10 +42,15 @@ export function schedule(state: PlannerState, now: string): Plan {
   const latest = Math.max(h0, ...baseItems().map((it) => it.deadline));
   const h1 = Math.min(latest, h0 + HORIZON_DAYS * 24 * SLOTS_PER_HOUR);
 
+  // A session the student marked missed is time they told us they could not use: keep it blocked.
+  const missedBusy = state.sessions
+    .filter((s) => s.status === "missed" && slotCeil(s.end_at) > h0)
+    .map((s) => ({ event_id: `missed-${s.id}`, title: "Missed session", kind: "other" as const, start_at: s.start_at, end_at: s.end_at }));
+
   const attempt = (mode: SortMode) => {
-    const grid = buildGrid(settings, [...state.busy].sort((a, b) => a.start_at.localeCompare(b.start_at) || a.event_id.localeCompare(b.event_id)), locked, h0, h1);
+    const grid = buildGrid(settings, [...state.busy, ...missedBusy].sort((a, b) => a.start_at.localeCompare(b.start_at) || a.event_id.localeCompare(b.event_id)), locked, h0, h1);
     const items = baseItems();
-    const placed = pace(grid, items, mode, settings, L);
+    const placed = pace(grid, items, mode, settings, L, buildHints(grid, state, h0, assignments.map((a) => a.id)));
     return { grid, items, placed };
   };
 
@@ -73,6 +79,26 @@ export function schedule(state: PlannerState, now: string): Plan {
   }));
 
   return { sessions, unplaced, loadByDay, warnings: [] };
+}
+
+/** The current plan's future movable sessions, as soft placement preferences. */
+function buildHints(g: Grid, state: PlannerState, h0: number, ids: string[]): Hints | undefined {
+  const movable = state.sessions
+    .filter((s) => s.status === "scheduled" && !isLocked(s, h0) && slotFloor(s.start_at) >= h0)
+    .sort((a, b) => a.start_at.localeCompare(b.start_at) || byId(a, b));
+  if (movable.length === 0) return undefined;
+  const index = new Map(ids.map((id, i) => [id, i]));
+  const owner = new Int32Array(g.h1 - g.h0).fill(-1);
+  const ranges = new Map<string, [number, number][]>();
+  for (const s of movable) {
+    const i = index.get(s.assignment_id);
+    if (i === undefined) continue;
+    const a = slotFloor(s.start_at);
+    const b = slotCeil(s.end_at);
+    for (let t = Math.max(a, g.h0); t < Math.min(b, g.h1); t++) owner[t - g.h0] = i;
+    ranges.set(s.assignment_id, [...(ranges.get(s.assignment_id) ?? []), [a, b]]);
+  }
+  return { owner, index, ranges };
 }
 
 function toSessions(placed: Placed[], version: number): StudySession[] {

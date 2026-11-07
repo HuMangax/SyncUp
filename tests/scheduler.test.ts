@@ -129,17 +129,33 @@ describe("hard limits under custom settings", () => {
     expect(placedHours(plan.sessions, "a-stats") + 2).toBeCloseTo(slotsToHours(roundUpToSlots(paddedRemainingHours(stats))), 5);
   });
 
-  it("drops future unlocked scheduled sessions and replans them", () => {
+  it("does not treat future unlocked sessions as occupied: an invalid old slot is simply replanned", () => {
     const { state, now } = seedState();
     const zone = state.settings.timezone;
+    // Old session sits on top of Wednesday's Marketing lecture, so it can never be kept.
     const old: StudySession = {
       id: "old-1", assignment_id: "a-marketing", subtask_id: null,
-      start_at: localToUtc(addDays(ANCHOR, 2), "11:00", zone), end_at: localToUtc(addDays(ANCHOR, 2), "12:00", zone),
+      start_at: localToUtc(addDays(ANCHOR, 2), "09:00", zone), end_at: localToUtc(addDays(ANCHOR, 2), "10:30", zone),
       status: "scheduled", minutes_done: 0, pinned: false, plan_version: 1,
     };
     const plan = schedule({ ...state, sessions: [old] }, now);
     expect(plan.sessions.length).toBeGreaterThan(0);
     expect(plan).toEqual(schedule(state, now));
+  });
+
+  it("prefers the current plan: an assignment keeps its own valid slots", () => {
+    const { state, now } = seedState();
+    const zone = state.settings.timezone;
+    // A valid but unusual slot: Wednesday 12:30-14:00 is free (seminar starts 14:00, buffer 15 min -> ends 13:45).
+    const old: StudySession = {
+      id: "old-1", assignment_id: "a-marketing", subtask_id: null,
+      start_at: localToUtc(addDays(ANCHOR, 2), "12:00", zone), end_at: localToUtc(addDays(ANCHOR, 2), "13:30", zone),
+      status: "scheduled", minutes_done: 0, pinned: false, plan_version: 1,
+    };
+    const s = { ...state, sessions: [old] };
+    const plan = schedule(s, now);
+    expect(plan.sessions.some((x) => x.assignment_id === "a-marketing" && x.start_at === old.start_at && x.end_at === old.end_at)).toBe(true);
+    valid(s, now, plan);
   });
 });
 

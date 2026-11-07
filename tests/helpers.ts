@@ -1,7 +1,10 @@
 import { expandEvents } from "@/lib/calendar/simulated";
 import { createSeed } from "@/lib/demo/seed";
 import { addDays, localDateKey, localToUtc, parseHM, slotFloor, slotLocalMinutes, weekdayOf } from "@/lib/time/slots";
-import type { Assignment, Plan, PlannerState, StudySession } from "@/lib/types";
+import type { Assignment, Plan, PlanData, PlannerState, StudySession } from "@/lib/types";
+import { toPlannerState } from "@/lib/planner";
+import { isLocked } from "@/lib/scheduler";
+import { slotCeil } from "@/lib/time/slots";
 
 export const ANCHOR = "2026-11-09"; // a Monday
 
@@ -39,7 +42,8 @@ export function violations(state: PlannerState, now: string, plan: Plan): string
   const out: string[] = [];
   const { settings } = state;
   const zone = settings.timezone;
-  const locked = state.sessions.filter((s) => s.status !== "cancelled" && s.status !== "missed");
+  // Only locked sessions survive a replan; future movable ones are replaced by plan.sessions.
+  const locked = state.sessions.filter((s) => isLocked(s, slotCeil(now)));
   const all: StudySession[] = [...plan.sessions, ...locked];
 
   for (const s of plan.sessions) {
@@ -78,4 +82,25 @@ export function violations(state: PlannerState, now: string, plan: Plan): string
   }
   for (const [d, h] of perDay) if (h > settings.max_hours_per_day + 1e-9) out.push(`${d} has ${h} h > max`);
   return out;
+}
+
+export function seedData(anchor = ANCHOR): { data: PlanData; now: string } {
+  const seed = createSeed(anchor);
+  return {
+    now: seed.now,
+    data: {
+      settings: seed.settings,
+      assignments: seed.assignments,
+      subtasks: seed.subtasks,
+      sessions: seed.sessions,
+      events: seed.events,
+      planVersion: 1,
+    },
+  };
+}
+
+/** Hard-limit violations of a proposal's resulting plan, evaluated against the data it was built from. */
+export function proposalViolations(data: PlanData, now: string, newSessions: StudySession[]): string[] {
+  const state = toPlannerState(data, now);
+  return violations(state, now, { sessions: newSessions, unplaced: {}, loadByDay: [], warnings: [] });
 }
