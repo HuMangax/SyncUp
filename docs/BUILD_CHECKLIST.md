@@ -54,9 +54,11 @@ Phases are ordered by gates, not hours. Do not start a phase until the previous 
 
 ## Phase 5: Stretch (only after Gate 4)
 
-- [ ] AI breakdown route: zod schema, 8 s timeout, one retry, template fallback, cached demo results, editable table, per-assignment toggle
-- [ ] Supabase `Repo` implementation and migrations
-- [ ] Google OAuth and Google `CalendarProvider` (dedicated "Study Planner" calendar, tagged events, never modify others)
+- [x] AI breakdown route: zod schema, 8 s timeout, one retry, template fallback, cached demo results, editable table, per-assignment toggle
+- [x] Supabase `Repo` implementation and migrations
+- [x] Google OAuth and Google `CalendarProvider` (dedicated "Study Planner" calendar, tagged events, never modify others)
+
+All three are unit-tested with injected/fake clients and verified in the browser without credentials. None has been exercised against the live service yet (needs keys/projects).
 
 ## Never cut
 

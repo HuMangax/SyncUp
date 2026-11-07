@@ -9,6 +9,7 @@ import type {
   PlanSnapshot,
   Proposal,
   ProposalTrigger,
+  EventOccurrence,
   RiskEntry,
   SessionStatus,
   StudySession,
@@ -19,6 +20,8 @@ import type {
 } from "@/lib/types";
 import { createSeed, demoAnchorFor } from "@/lib/demo/seed";
 import { markNextMissed, squeezeWeek, surpriseShift } from "@/lib/demo/controls";
+import { syncToGoogle } from "@/lib/calendar/sync-client";
+import type { StoredState } from "@/lib/repo/rows";
 import { acceptProposal, buildProposal, currentRisk, generateInitial, undoAccept } from "@/lib/progress/proposal";
 import { applySessionStatus, remainingHours, setPercent, setRemaining } from "@/lib/progress/remaining";
 import {
@@ -50,6 +53,10 @@ type Data = {
   risk: RiskEntry[];
   /** Sessions added or moved by the last accept, so the calendar can show what changed. */
   lastChanged: { ids: string[]; at: number } | null;
+  /** Google Calendar is connected (set by Settings after checking the server). */
+  googleConnected: boolean;
+  /** Result of the last Google sync, shown on the calendar. */
+  syncNote: string | null;
 };
 
 export type PlannerStore = Data & {
@@ -79,6 +86,9 @@ export type PlannerStore = Data & {
   deleteEvent: (id: string) => void;
   exportState: () => string;
   importState: (json: string) => { ok: true } | { ok: false; error: string };
+  loadStored: (state: StoredState) => void;
+  setGoogleConnected: (connected: boolean) => void;
+  importGoogleEvents: (events: EventOccurrence[]) => void;
 };
 
 const initial = (): Data => {
@@ -97,6 +107,8 @@ const initial = (): Data => {
     warnings: [],
     risk: [],
     lastChanged: null,
+    googleConnected: false,
+    syncNote: null,
   };
 };
 
@@ -215,6 +227,22 @@ export const usePlanner = create<PlannerStore>()(
             undo: { snapshot, warnings: s.warnings, risk: s.risk },
             proposals: s.proposals.map((x) => (x.id === p.id ? { ...x, state: "accepted" as const } : x)),
           });
+          if (s.googleConnected) {
+            // Best effort: never blocks the accept. Unsynced sessions are retried on the next accept.
+            const nowMs = Date.parse(s.now);
+            const upserts = data.sessions.filter(
+              (x) => x.status === "scheduled" && Date.parse(x.end_at) > nowMs && (changed.includes(x.id) || !x.external_id),
+            );
+            const removes = p.diff.flatMap((e) => (e.kind === "removed" && e.before?.external_id ? [e.before.external_id] : []));
+            set({ syncNote: "Syncing to Google Calendar…" });
+            void syncToGoogle(s.settings.timezone, upserts, removes).then((r) => {
+              if ("error" in r) return set({ syncNote: `Not synced to Google Calendar (${r.error}). Will retry next time.` });
+              set((cur) => ({
+                sessions: cur.sessions.map((x) => (r.synced[x.id] ? { ...x, external_id: r.synced[x.id] } : x)),
+                syncNote: r.failed.length ? `${r.failed.length} sessions not synced. Will retry next time.` : "Synced to Google Calendar.",
+              }));
+            });
+          }
         },
 
         reject: (proposalId) =>
@@ -308,6 +336,40 @@ export const usePlanner = create<PlannerStore>()(
           const s = get();
           const out: ExportedState = { version: 1, now: s.now, anchor: s.anchor, ...planData(s) };
           return JSON.stringify(out, null, 2);
+        },
+
+        loadStored: (v) => {
+          set({
+            anchor: v.anchor,
+            now: v.now,
+            settings: v.settings,
+            assignments: v.assignments,
+            subtasks: v.subtasks,
+            sessions: v.sessions,
+            events: v.events,
+            planVersion: v.planVersion,
+            proposals: [],
+            undo: null,
+          });
+          get().generateWarnings();
+        },
+
+        setGoogleConnected: (connected) => set({ googleConnected: connected }),
+
+        // Real calendar replaces the seeded simulated one; commitments the student added here stay.
+        importGoogleEvents: (occ) => {
+          const s = get();
+          const google: CalendarEvent[] = occ.map((o) => ({
+            id: `${o.event_id}-${o.start_at}`,
+            source: "google",
+            external_id: o.event_id.replace(/^g-/, ""),
+            title: o.title,
+            kind: o.kind,
+            start_at: o.start_at,
+            end_at: o.end_at,
+            read_only: true,
+          }));
+          propose({ ...planData(s), events: [...s.events.filter((e) => e.id.startsWith("ev-user-")), ...google] }, { type: "calendar_change" });
         },
 
         importState: (json) => {

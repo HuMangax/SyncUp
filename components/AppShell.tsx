@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, ClipboardList, GitCompareArrows, LayoutDashboard, Settings } from "lucide-react";
 import { pendingProposal, usePlanner } from "@/store/planner";
 import { DemoPanel } from "./DemoPanel";
+import { SupabaseSync } from "./SupabaseSync";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -67,6 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {ready && <DemoPanel />}
+      {ready && <SupabaseSync />}
 
       <nav
         aria-label="Main"

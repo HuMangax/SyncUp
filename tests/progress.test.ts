@@ -137,6 +137,18 @@ describe("proposals", () => {
     }
   });
 
+  it("adding subtasks tags sessions that stay in place", () => {
+    const { data, now } = planned();
+    const subtasks = [1, 2, 3].map((i) => ({
+      id: `st-${i}`, assignment_id: "a-marketing", title: `Step ${i}`, order_idx: i, estimate_hours: 8 / 3, percent_complete: 0, source: "template" as const,
+    }));
+    const p = buildProposal({ ...data, subtasks }, now, { type: "assignment_change" }, "p-1");
+    const mk = p.new_sessions.filter((x) => x.assignment_id === "a-marketing");
+    expect(mk.length).toBeGreaterThan(0);
+    expect(mk.every((x) => x.subtask_id?.startsWith("st-"))).toBe(true);
+    expect(p.diff.filter((e) => e.assignment_id === "a-marketing").every((e) => e.kind === "kept")).toBe(true);
+  });
+
   it("setting 25% shrinks the work with AHEAD_PACE and removes sessions", () => {
     const { data, now } = planned();
     const d = { ...data, assignments: data.assignments.map((a) => (a.id === "a-marketing" ? setPercent(a, 25) : a)) };

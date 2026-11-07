@@ -43,7 +43,7 @@ function minutesInDay(iso: string, zone: string, dayKey: string, edge: "start" |
 }
 
 export function WeekGrid() {
-  const { now, events, sessions, assignments, subtasks, settings, warnings, generatePlan, lastChanged, undo, undoLast } = usePlanner();
+  const { now, events, sessions, assignments, subtasks, settings, warnings, generatePlan, lastChanged, undo, undoLast, syncNote } = usePlanner();
   const [openSession, setOpenSession] = useState<string | null>(null);
   const [openEvent, setOpenEvent] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -249,6 +249,7 @@ export function WeekGrid() {
       <div className="mb-3">
         <Warnings warnings={warnings} compact />
       </div>
+      {syncNote && <p role="status" className="mb-3 text-xs text-muted">{syncNote}</p>}
       {openSession && <SessionDialog sessionId={openSession} onClose={() => setOpenSession(null)} />}
       {openEvent && <RemoveEventDialog eventId={openEvent} onClose={() => setOpenEvent(null)} />}
       {adding && <AddEventDialog defaultDate={mobileDay} onClose={() => setAdding(false)} />}

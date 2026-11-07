@@ -4,6 +4,15 @@ Record choices made where the spec or design was ambiguous, and anything left un
 
 | Date | Decision | Why |
 | --- | --- | --- |
+| 2026-11-07 | NOT DONE: live verification of the Claude call, Supabase and Google Calendar | No credentials in the build environment, and connecting would touch real accounts. Logic is unit-tested with fakes; the no-config paths are browser-verified |
+| 2026-11-07 | NOT DONE (team): two live rehearsals with Reset and the 90-second backup video | Scripted rehearsal runs in headless Chrome, but the gate asks for humans |
+| 2026-11-07 | Subtask progress is not tracked per subtask; the student updates the assignment percent and sessions are tagged with the subtask at that point of the work | Keeps one progress input; the design's hours-weighted subtask percent can be added later |
+| 2026-11-07 | AI breakdown uses `output_config.format` (JSON schema) and our own zod validation/clamping, effort `low`, server-side refusal fallbacks (`fallbacks: "default"`), model from `ANTHROPIC_MODEL` (default `claude-opus-5-5`) | Structured output keeps JSON well-formed; range rules (3-8 steps, 0.5-6 h, total within 25%) need our own pass anyway |
+| 2026-11-07 | Google refresh token is stored AES-256-GCM encrypted in an httpOnly cookie (`GOOGLE_TOKEN_SECRET`), not in a database | Works without Supabase; the token is unreadable to page scripts and opaque at rest. Move to a server table if Supabase is the main store |
+| 2026-11-07 | Google import reads the primary calendar only; all-day and "free" events don't block time; the seeded simulated events are replaced, student-added commitments kept | Matches the design's import rules with the smallest surface |
+| 2026-11-07 | Google sync runs after accept, best effort; unsynced sessions are retried on the next accept and a note shows on the Calendar | "A failed sync never blocks accepting a plan" |
+| 2026-11-07 | Supabase stores the plan state (settings, assignments, subtasks, events, sessions, clock); proposals, undo snapshot and warnings stay local and are recomputed | Warnings are derived; proposals are short-lived review state |
+| 2026-11-07 | Supabase sign-in (Supabase Auth with Google) and Google Calendar consent are separate steps | Calendar scopes are only requested when the student connects their calendar |
 | 2026-11-07 | Students can add commitments to the simulated calendar and remove only the ones they added (`ev-user-*`); seeded/imported events stay read-only | The MVP needs "add or simulate commitments"; the planner itself still never edits calendar events |
 | 2026-11-07 | Accepting a proposal highlights moved/added sessions on the calendar for 4 s ("Updated" tag + ring), off under reduced motion | Makes the reorganization visible during the demo; it is the only non-user-triggered motion |
 | 2026-11-07 | Deleting, completing or editing an assignment and adding/removing a commitment all go through proposals | Consistent with rule 5; only the very first plan is applied directly |

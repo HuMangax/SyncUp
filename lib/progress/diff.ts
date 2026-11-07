@@ -94,8 +94,10 @@ export function reconcile(
   result.forEach((n, i) => {
     const o = matchedOld.get(i);
     if (o) {
-      sessions.push(o);
-      pairs.push({ kind: "kept", before: o, after: o });
+      // Same time and id; only the subtask label follows the new plan.
+      const kept = o.subtask_id === n.subtask_id ? o : { ...o, subtask_id: n.subtask_id };
+      sessions.push(kept);
+      pairs.push({ kind: "kept", before: o, after: kept });
     }
   });
 

@@ -7,6 +7,7 @@ import { SettingsInput } from "@/lib/validation";
 import type { PreferredWindow, UserSettings } from "@/lib/types";
 import { field, primaryBtn } from "@/components/Modal";
 import { GoogleConnect } from "@/components/GoogleConnect";
+import { AccountPanel } from "@/components/SupabaseSync";
 
 const WINDOWS: { key: string; label: string; w: PreferredWindow }[] = [
   { key: "morning", label: "Mornings (8 am – 12 pm)", w: { start: "08:00", end: "12:00" } },
@@ -159,6 +160,7 @@ export default function SettingsPage() {
       </fieldset>
 
       <GoogleConnect />
+      <AccountPanel />
 
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
       <div className="sticky bottom-20 flex justify-end rounded-2xl border border-border bg-card p-3 md:bottom-4">
