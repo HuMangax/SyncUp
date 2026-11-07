@@ -19,8 +19,16 @@ import type {
 } from "@/lib/types";
 import { createSeed, demoAnchorFor } from "@/lib/demo/seed";
 import { markNextMissed, squeezeWeek, surpriseShift } from "@/lib/demo/controls";
-import { acceptProposal, buildProposal, generateInitial, undoAccept } from "@/lib/progress/proposal";
+import { acceptProposal, buildProposal, currentRisk, generateInitial, undoAccept } from "@/lib/progress/proposal";
 import { applySessionStatus, remainingHours, setPercent, setRemaining } from "@/lib/progress/remaining";
+import {
+  assignmentFromInput,
+  eventFromInput,
+  parseImportedState,
+  type AssignmentInput,
+  type EventInput,
+  type ExportedState,
+} from "@/lib/validation";
 
 type Undo = { snapshot: PlanSnapshot; warnings: Warning[]; risk: RiskEntry[] };
 
@@ -40,12 +48,16 @@ type Data = {
   /** Warnings and risk of the current accepted plan. */
   warnings: Warning[];
   risk: RiskEntry[];
+  /** Sessions added or moved by the last accept, so the calendar can show what changed. */
+  lastChanged: { ids: string[]; at: number } | null;
 };
 
 export type PlannerStore = Data & {
   reset: () => void;
   advanceClock: (hours: number) => void;
   generatePlan: () => void;
+  /** Recompute warnings and risk for the current plan (e.g. after import). */
+  generateWarnings: () => void;
   markSession: (id: string, status: SessionStatus, minutesDone?: number) => void;
   togglePin: (id: string) => void;
   setProgress: (assignmentId: string, change: { percent?: number; remaining?: number }) => void;
@@ -58,6 +70,15 @@ export type PlannerStore = Data & {
   demoLogMarketing: () => void;
   demoSurpriseShift: () => void;
   demoSqueezeWeek: () => void;
+  addAssignment: (input: AssignmentInput) => void;
+  updateAssignment: (id: string, input: AssignmentInput) => void;
+  deleteAssignment: (id: string) => void;
+  completeAssignment: (id: string) => void;
+  setSubtasks: (assignmentId: string, subtasks: Subtask[]) => void;
+  addEvent: (input: EventInput) => void;
+  deleteEvent: (id: string) => void;
+  exportState: () => string;
+  importState: (json: string) => { ok: true } | { ok: false; error: string };
 };
 
 const initial = (): Data => {
@@ -75,7 +96,14 @@ const initial = (): Data => {
     undo: null,
     warnings: [],
     risk: [],
+    lastChanged: null,
   };
+};
+
+const nextId = (prefix: string, taken: { id: string }[]) => {
+  let i = 1;
+  while (taken.some((x) => x.id === `${prefix}-${i}`)) i++;
+  return `${prefix}-${i}`;
 };
 
 const planData = (s: Data): PlanData => ({
@@ -116,6 +144,12 @@ export const usePlanner = create<PlannerStore>()(
           const s = get();
           const g = generateInitial(planData(s), s.now);
           set({ ...g.data, warnings: g.warnings, risk: g.risk });
+        },
+
+        generateWarnings: () => {
+          const s = get();
+          const r = currentRisk(planData(s), s.now);
+          set({ warnings: r.warnings, risk: r.risk });
         },
 
         markSession: (id, status, minutesDone) => {
@@ -171,8 +205,11 @@ export const usePlanner = create<PlannerStore>()(
             return;
           }
           const { data, snapshot } = acceptProposal(planData(s), p, s.now);
+          const changed = p.diff.filter((e) => e.kind === "moved" || e.kind === "added").map((e) => e.after!.id);
           set({
             ...data,
+            // Wall-clock time only drives the highlight animation, never scheduling.
+            lastChanged: { ids: changed, at: Date.now() },
             warnings: p.warnings,
             risk: p.risk,
             undo: { snapshot, warnings: s.warnings, risk: s.risk },
@@ -217,10 +254,84 @@ export const usePlanner = create<PlannerStore>()(
           const s = get();
           propose(squeezeWeek(planData(s), s.now), { type: "calendar_change" });
         },
+
+        addAssignment: (input) => {
+          const s = get();
+          const a = assignmentFromInput(input, s.settings.timezone, nextId("a-user", s.assignments));
+          propose({ ...planData(s), assignments: [...s.assignments, a] }, { type: "assignment_change" });
+        },
+
+        updateAssignment: (id, input) => {
+          const s = get();
+          const old = s.assignments.find((a) => a.id === id);
+          if (!old) return;
+          const a = assignmentFromInput(input, s.settings.timezone, id, old);
+          propose({ ...planData(s), assignments: s.assignments.map((x) => (x.id === id ? a : x)) }, { type: "assignment_change" });
+        },
+
+        deleteAssignment: (id) => {
+          const s = get();
+          propose(
+            {
+              ...planData(s),
+              assignments: s.assignments.filter((a) => a.id !== id),
+              subtasks: s.subtasks.filter((t) => t.assignment_id !== id),
+            },
+            { type: "assignment_change" },
+          );
+        },
+
+        completeAssignment: (id) => get().setProgress(id, { percent: 100 }),
+
+        setSubtasks: (assignmentId, subtasks) => {
+          const s = get();
+          propose(
+            { ...planData(s), subtasks: [...s.subtasks.filter((t) => t.assignment_id !== assignmentId), ...subtasks] },
+            { type: "assignment_change" },
+          );
+        },
+
+        addEvent: (input) => {
+          const s = get();
+          const ev = eventFromInput(input, s.settings.timezone, nextId("ev-user", s.events));
+          propose({ ...planData(s), events: [...s.events, ev] }, { type: "calendar_change" });
+        },
+
+        // Only commitments added in this app can be removed; seeded/imported calendars stay read-only.
+        deleteEvent: (id) => {
+          const s = get();
+          if (!id.startsWith("ev-user-")) return;
+          propose({ ...planData(s), events: s.events.filter((e) => e.id !== id) }, { type: "calendar_change" });
+        },
+
+        exportState: () => {
+          const s = get();
+          const out: ExportedState = { version: 1, now: s.now, anchor: s.anchor, ...planData(s) };
+          return JSON.stringify(out, null, 2);
+        },
+
+        importState: (json) => {
+          const r = parseImportedState(json);
+          if (!r.ok) return r;
+          const v = r.value;
+          set({
+            ...initial(),
+            anchor: v.anchor,
+            now: v.now,
+            settings: v.settings,
+            assignments: v.assignments,
+            subtasks: v.subtasks,
+            sessions: v.sessions,
+            events: v.events as CalendarEvent[],
+            planVersion: v.planVersion,
+          });
+          get().generateWarnings();
+          return { ok: true };
+        },
       };
     },
     {
-      name: "adaptive-planner-v3",
+      name: "adaptive-planner-v4",
       storage: createJSONStorage(() => localStorage),
       // Rehydrated on the client after mount to avoid SSR hydration mismatches.
       skipHydration: true,

@@ -4,6 +4,10 @@ Record choices made where the spec or design was ambiguous, and anything left un
 
 | Date | Decision | Why |
 | --- | --- | --- |
+| 2026-11-07 | Students can add commitments to the simulated calendar and remove only the ones they added (`ev-user-*`); seeded/imported events stay read-only | The MVP needs "add or simulate commitments"; the planner itself still never edits calendar events |
+| 2026-11-07 | Accepting a proposal highlights moved/added sessions on the calendar for 4 s ("Updated" tag + ring), off under reduced motion | Makes the reorganization visible during the demo; it is the only non-user-triggered motion |
+| 2026-11-07 | Deleting, completing or editing an assignment and adding/removing a commitment all go through proposals | Consistent with rule 5; only the very first plan is applied directly |
+| 2026-11-07 | Settings page uses presets (study-time windows, three session-length presets) rather than free-form windows | Simpler for students; the data model still stores arbitrary windows |
 | 2026-11-07 | The scheduler uses the current plan's movable sessions as soft hints: an assignment tries its own old slots first and avoids slots other assignments hold | A from-scratch replan reshuffled unrelated assignments after one missed session. Hints only order the choice of free slots; hard limits are unchanged |
 | 2026-11-07 | A session marked missed keeps its time blocked in later replans | The student said they could not use that time; otherwise the work went straight back into the same slot |
 | 2026-11-07 | A superseding proposal carries the triggers of the pending ones it replaced (`prior_triggers`) | Presenter steps 4 and 5 happen before review; the Preview lists both and keeps the missed-session reason |

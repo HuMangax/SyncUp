@@ -42,6 +42,12 @@ export function generateInitial(
   };
 }
 
+/** Warnings and risk for the plan as it stands (no replan): what is booked vs what is needed. */
+export function currentRisk(data: PlanData, now: string): { warnings: Warning[]; risk: RiskEntry[] } {
+  const p = buildProposal(data, now, { type: "clock" }, "current");
+  return { warnings: p.warnings, risk: p.risk };
+}
+
 /**
  * Pipeline: (progress already applied to `data`) -> replan with locked sessions occupied ->
  * stabilize -> diff with reason codes -> risk per deadline -> pending proposal.
@@ -86,6 +92,11 @@ export function buildProposal(
 
   function explain(p: Pair, aid: string): { reason: ReasonCode; explanation: string } {
     const t = title.get(aid) ?? "This assignment";
+    const assignment = data.assignments.find((a) => a.id === aid);
+    if (!assignment) return { reason: "AHEAD_PACE", explanation: "This assignment was removed, so its time is freed up." };
+    if (assignment.status === "completed") {
+      return { reason: "AHEAD_PACE", explanation: `${t} is done, so its remaining sessions are freed up.` };
+    }
     if (p.before && !isStillValid(p.before)) {
       const clash = state.busy.find(
         (b) => Date.parse(b.start_at) < Date.parse(p.before!.end_at) && Date.parse(p.before!.start_at) < Date.parse(b.end_at),

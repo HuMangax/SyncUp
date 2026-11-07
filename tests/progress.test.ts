@@ -121,6 +121,22 @@ describe("proposals", () => {
     expect(changed.some((e) => e.reason === "MISSED_RETURNED")).toBe(true);
   });
 
+  it("deleting or completing an assignment frees its sessions with a clear reason", () => {
+    const { data, now } = planned();
+    for (const d of [
+      { ...data, assignments: data.assignments.filter((a) => a.id !== "a-operations") },
+      { ...data, assignments: data.assignments.map((a) => (a.id === "a-operations" ? setPercent(a, 100) : a)) },
+    ]) {
+      const p = buildProposal(d, now, { type: "assignment_change" }, "p-1");
+      const ops = p.diff.filter((e) => e.assignment_id === "a-operations");
+      expect(ops.length).toBeGreaterThan(0);
+      for (const e of ops) {
+        expect(e.kind).toBe("removed");
+        expect(e.explanation).toMatch(/done|removed/);
+      }
+    }
+  });
+
   it("setting 25% shrinks the work with AHEAD_PACE and removes sessions", () => {
     const { data, now } = planned();
     const d = { ...data, assignments: data.assignments.map((a) => (a.id === "a-marketing" ? setPercent(a, 25) : a)) };

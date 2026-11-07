@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen md:flex">
       <aside className="hidden md:flex md:w-56 md:shrink-0 md:flex-col md:border-r md:border-border md:bg-card md:px-3 md:py-5">
         <div className="mb-6 px-3 text-base font-semibold tracking-tight">
-          <span className="text-accent">●</span> Adaptive Planner
+          Adaptive Planner
         </div>
         <nav aria-label="Main" className="flex flex-col gap-1">
           {NAV.map(({ href, label, icon: Icon }) => {
@@ -60,7 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="font-semibold">Your plan has updates to review.</span>{" "}
               {changed === 0 ? "Nothing needs to move." : `${changed} session${changed === 1 ? "" : "s"} would change.`}
             </span>
-            <span className="shrink-0 font-semibold text-accent">Review →</span>
+            <span className="shrink-0 font-semibold text-accent">Review changes</span>
           </Link>
         )}
         {ready ? children : <div className="text-sm text-muted">Loading your week…</div>}

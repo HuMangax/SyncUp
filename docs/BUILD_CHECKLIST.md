@@ -40,17 +40,17 @@ Phases are ordered by gates, not hours. Do not start a phase until the previous 
 
 ## Phase 4: Demo polish
 
-- [ ] Dashboard: today's sessions, deadlines, weekly workload meter, progress bars, warnings
-- [ ] Assignments page: cards, add/edit sheet, delete, complete, risk chip
-- [ ] Settings page: windows, max hours, session length, breaks, free days, bedtime, wake, wind-down, AI default
-- [ ] Warning banners and suggestion buttons
-- [ ] DemoPanel: Reset, Advance clock, Mark next session missed, Log 1 h and set 25%, Surprise shift, Squeeze week, Export/Import
-- [ ] Mobile single-day calendar view, verified at 390 px
-- [ ] Accessibility: icons and patterns beyond color, keyboard reachable controls, AA contrast
-- [ ] Seed tests: opening plan has no deadline risk; Squeeze week is red
+- [x] Dashboard: today's sessions, deadlines, weekly workload meter, progress bars, warnings
+- [x] Assignments page: cards, add/edit sheet, delete, complete, risk chip
+- [x] Settings page: windows, max hours, session length, breaks, free days, bedtime, wake, wind-down, AI default
+- [x] Warning banners and suggestion buttons
+- [x] DemoPanel: Reset, Advance clock, Mark next session missed, Log 1 h and set 25%, Surprise shift, Squeeze week, Export/Import
+- [x] Mobile single-day calendar view, verified at 390 px
+- [x] Accessibility: icons and patterns beyond color, keyboard reachable controls, AA contrast
+- [x] Seed tests: opening plan has no deadline risk; Squeeze week is red
 - [ ] Rehearse the script twice with Reset; record a 90-second backup video; test the production build locally
 
-**Gate 4:** rehearsed twice, backup video recorded, no console errors at 1440 px and 390 px.
+**Gate 4:** rehearsed twice, backup video recorded, no console errors at 1440 px and 390 px. (Automated: presenter script and every page/flow scripted in headless Chrome at both widths with no console errors and axe WCAG A/AA clean. Still to do by the team: two live rehearsals and the backup video.)
 
 ## Phase 5: Stretch (only after Gate 4)
 

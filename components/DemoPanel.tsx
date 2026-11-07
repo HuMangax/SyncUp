@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FlaskConical, X } from "lucide-react";
 import { usePlanner } from "@/store/planner";
 import { fmtDayTime } from "./fmt";
@@ -8,7 +8,24 @@ import { fmtDayTime } from "./fmt";
 /** Presenter controls. Each calls the same store actions as the UI: no demo-only scheduling. */
 export function DemoPanel() {
   const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const file = useRef<HTMLInputElement>(null);
   const s = usePlanner();
+
+  const exportJson = () => {
+    const blob = new Blob([s.exportState()], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `planner-${s.anchor}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMsg("Exported.");
+  };
+  const importJson = async (f: File) => {
+    const r = s.importState(await f.text());
+    setMsg(r.ok ? "Imported." : r.error);
+  };
   if (process.env.NEXT_PUBLIC_DEMO !== "1") return null;
 
   const items: [string, () => void][] = [
@@ -31,10 +48,27 @@ export function DemoPanel() {
           <p className="mb-2 text-xs text-muted">Clock: {fmtDayTime(s.now, s.settings.timezone)}</p>
           <div className="flex flex-col gap-1.5">
             {items.map(([label, fn]) => (
-              <button key={label} onClick={fn} className="rounded-lg border border-border px-3 py-1.5 text-left text-sm hover:bg-black/5">
+              <button key={label} onClick={() => { setMsg(null); fn(); }} className="rounded-lg border border-border px-3 py-1.5 text-left text-sm hover:bg-black/5">
                 {label}
               </button>
             ))}
+            <div className="mt-1 grid grid-cols-2 gap-1.5">
+              <button onClick={exportJson} className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-black/5">Export</button>
+              <button onClick={() => file.current?.click()} className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-black/5">Import</button>
+            </div>
+            <input
+              ref={file}
+              type="file"
+              accept="application/json"
+              className="sr-only"
+              aria-label="Import planner state file"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void importJson(f);
+                e.target.value = "";
+              }}
+            />
+            {msg && <p role="status" className="text-xs text-muted">{msg}</p>}
           </div>
         </div>
       ) : (

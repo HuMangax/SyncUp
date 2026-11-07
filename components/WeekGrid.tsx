@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
-import { Briefcase, BookOpen, ChevronLeft, ChevronRight, Flag, Heart, Pencil, Pin } from "lucide-react";
+import { Briefcase, BookOpen, ChevronLeft, ChevronRight, Flag, Heart, Pencil, Pin, Plus, Undo2 } from "lucide-react";
 import { usePlanner } from "@/store/planner";
 import { SessionDialog } from "./SessionDialog";
 import { Warnings } from "./Warnings";
+import { AddEventDialog, RemoveEventDialog } from "./EventDialog";
 import { expandEvents } from "@/lib/calendar/simulated";
 import { addDays, localDateKey, localToUtc, mondayOnOrBefore } from "@/lib/time/slots";
 import type { EventKind, EventOccurrence, StudySession } from "@/lib/types";
@@ -31,6 +32,7 @@ type Block = {
   pinned?: boolean;
   status?: string;
   sessionId?: string;
+  eventId?: string;
 };
 
 function minutesInDay(iso: string, zone: string, dayKey: string, edge: "start" | "end"): number {
@@ -41,8 +43,18 @@ function minutesInDay(iso: string, zone: string, dayKey: string, edge: "start" |
 }
 
 export function WeekGrid() {
-  const { now, events, sessions, assignments, settings, warnings, generatePlan } = usePlanner();
+  const { now, events, sessions, assignments, settings, warnings, generatePlan, lastChanged, undo, undoLast } = usePlanner();
   const [openSession, setOpenSession] = useState<string | null>(null);
+  const [openEvent, setOpenEvent] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  // Highlight sessions that the last accepted proposal moved or added, for a few seconds.
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!lastChanged || Date.now() - lastChanged.at > 8000) return;
+    setFresh(new Set(lastChanged.ids));
+    const t = setTimeout(() => setFresh(new Set()), 4000);
+    return () => clearTimeout(t);
+  }, [lastChanged]);
   const hasPlan = sessions.some((s) => s.status === "scheduled");
   const zone = settings.timezone;
   const todayKey = localDateKey(now, zone);
@@ -76,7 +88,7 @@ export function WeekGrid() {
     const fmt = (iso: string) => DateTime.fromISO(iso, { zone: "utc" }).setZone(zone).toFormat("h:mm a");
     occurrences.forEach((o: EventOccurrence) => {
       const c = clip(o.start_at, o.end_at);
-      if (c) out.push({ key: `${o.event_id}-${o.start_at}`, top: c.top, height: c.height, title: o.title, sub: `${fmt(o.start_at)} – ${fmt(o.end_at)}`, kind: o.kind });
+      if (c) out.push({ key: `${o.event_id}-${o.start_at}`, top: c.top, height: c.height, title: o.title, sub: `${fmt(o.start_at)} – ${fmt(o.end_at)}`, kind: o.kind, eventId: o.event_id });
     });
     sessions
       .filter((s: StudySession) => s.status !== "cancelled")
@@ -86,6 +98,11 @@ export function WeekGrid() {
       });
     return out;
   };
+
+  const loadOf = (dayKey: string) =>
+    sessions
+      .filter((s) => s.status !== "cancelled" && s.status !== "missed" && localDateKey(s.start_at, zone) === dayKey)
+      .reduce((h, s) => h + (Date.parse(s.end_at) - Date.parse(s.start_at)) / 3.6e6, 0);
 
   const deadlinesFor = (dayKey: string) =>
     assignments.filter((a) => localDateKey(a.due_at, zone) === dayKey);
@@ -99,11 +116,22 @@ export function WeekGrid() {
       {hours.map((h, i) => (
         <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: i * HOUR_H }} />
       ))}
+      {dayKey === todayKey && (() => {
+        const m = minutesInDay(now, zone, dayKey, "start");
+        if (m < GRID_START * 60 || m >= GRID_END * 60) return null;
+        return (
+          <div className="pointer-events-none absolute inset-x-0 z-20 flex items-center" style={{ top: ((m - GRID_START * 60) / 60) * HOUR_H }} aria-hidden>
+            <span className="-ml-1 h-2 w-2 rounded-full bg-red-600" />
+            <span className="h-px flex-1 bg-red-600" />
+          </div>
+        );
+      })()}
       {blocksFor(dayKey).map((b) => {
         const study = b.kind === "study";
         const style = study ? null : KIND_STYLE[b.kind as EventKind];
         const Icon = study ? Pencil : style!.Icon;
-        const cls = `absolute inset-x-0.5 overflow-hidden rounded-md border-l-4 px-1.5 py-0.5 text-left text-[11px] leading-tight ${
+        const isFresh = !!b.sessionId && fresh.has(b.sessionId);
+        const cls = `absolute inset-x-0.5 overflow-hidden rounded-md border-l-4 ${isFresh ? "just-moved z-10" : ""} px-1.5 py-0.5 text-left text-[11px] leading-tight ${
           study ? "border-indigo-800 bg-indigo-600 text-white shadow-sm hover:bg-indigo-700" : `${style!.cls} hatch`
         } ${b.status === "missed" ? "opacity-50 line-through" : ""} ${b.status === "completed" ? "bg-indigo-400" : ""}`;
         const body = (
@@ -114,6 +142,7 @@ export function WeekGrid() {
               {b.pinned && <Pin size={10} aria-label="Pinned" />}
               {b.status && b.status !== "scheduled" && <span className="sr-only">({b.status})</span>}
             </div>
+            {isFresh && <span className="absolute right-1 top-0.5 rounded bg-white px-1 text-[9px] font-bold text-indigo-800">Updated</span>}
             {b.height > 30 && <div className="truncate opacity-90">{b.sub}</div>}
           </>
         );
@@ -128,8 +157,18 @@ export function WeekGrid() {
           >
             {body}
           </button>
+        ) : b.eventId?.startsWith("ev-user-") ? (
+          <button
+            key={b.key}
+            aria-label={`${b.title}, ${b.sub}. Edit commitment`}
+            className={cls}
+            style={{ top: b.top, height: b.height }}
+            onClick={() => setOpenEvent(b.eventId!)}
+          >
+            {body}
+          </button>
         ) : (
-          <div key={b.key} title={`${b.title} · ${b.sub}`} className={cls} style={{ top: b.top, height: b.height }}>
+          <div key={b.key} title={`${b.title}, ${b.sub} (from your calendar, read-only)`} className={cls} style={{ top: b.top, height: b.height }}>
             {body}
           </div>
         );
@@ -140,6 +179,9 @@ export function WeekGrid() {
   const header = (k: string) => (
     <div key={k} className="border-l border-border px-1 pb-1 text-center">
       <div className={`text-xs font-medium ${k === todayKey ? "text-accent" : "text-muted"}`}>{label(k)}</div>
+      {loadOf(k) >= 0.9 * settings.max_hours_per_day && loadOf(k) > 0 && (
+        <div className="hatch mt-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-900">Full day: {Math.round(loadOf(k) * 10) / 10} h</div>
+      )}
       {deadlinesFor(k).map((a) => (
         <div key={a.id} className="mt-1 flex items-center justify-center gap-1 rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-800">
           <Flag size={10} aria-hidden /> <span className="truncate">Due: {a.title}</span>
@@ -159,13 +201,24 @@ export function WeekGrid() {
   );
 
   const nav = (
-    <div className="mb-3 flex items-center justify-between">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
       <h1 className="text-xl font-semibold tracking-tight">Calendar</h1>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
+        {undo && (
+          <button onClick={undoLast} className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm font-medium hover:bg-black/5">
+            <Undo2 size={15} aria-hidden /> Undo
+          </button>
+        )}
+        <button onClick={() => setAdding(true)} className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm font-medium hover:bg-black/5">
+          <Plus size={15} aria-hidden /> Commitment
+        </button>
+        <button onClick={() => { setWeekStart(mondayOnOrBefore(todayKey)); setMobileDay(todayKey); }} className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm font-medium hover:bg-black/5">
+          Today
+        </button>
         {!hasPlan && (
           <button
             onClick={generatePlan}
-            className="mr-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
           >
             Generate plan
           </button>
@@ -184,6 +237,7 @@ export function WeekGrid() {
       <li className="flex items-center gap-1"><span className="hatch inline-block h-3 w-3 rounded-sm bg-amber-200" /><Briefcase size={11} /> Work</li>
       <li className="flex items-center gap-1"><span className="hatch inline-block h-3 w-3 rounded-sm bg-rose-200" /><Heart size={11} /> Social</li>
       <li className="flex items-center gap-1"><Flag size={11} className="text-red-700" /> Deadline</li>
+      <li className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-red-600" /> Now</li>
     </ul>
   );
 
@@ -195,6 +249,8 @@ export function WeekGrid() {
         <Warnings warnings={warnings} compact />
       </div>
       {openSession && <SessionDialog sessionId={openSession} onClose={() => setOpenSession(null)} />}
+      {openEvent && <RemoveEventDialog eventId={openEvent} onClose={() => setOpenEvent(null)} />}
+      {adding && <AddEventDialog defaultDate={mobileDay} onClose={() => setAdding(false)} />}
 
       {/* Desktop: full week */}
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-card md:block">
