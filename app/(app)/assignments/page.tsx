@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, ListTree, Pencil, Plus, Trash2 } from "lucide-react";
 import { usePlanner } from "@/store/planner";
 import { RiskChip } from "@/components/RiskChip";
 import { AssignmentForm } from "@/components/AssignmentForm";
+import { BreakdownPanel } from "@/components/BreakdownPanel";
 import { fmtDue, fmtHours } from "@/components/fmt";
 import { primaryBtn } from "@/components/Modal";
 import { remainingHours } from "@/lib/progress/remaining";
@@ -64,6 +65,7 @@ function AssignmentCard({ a, zone, risk, onEdit }: { a: Assignment; zone: string
   const [pct, setPct] = useState(String(a.percent_complete));
   const [rem, setRem] = useState(String(Math.round(remainingHours(a) * 100) / 100));
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [breakdown, setBreakdown] = useState(false);
   const mine = subtasks.filter((t) => t.assignment_id === a.id).sort((x, y) => x.order_idx - y.order_idx);
   const iconBtn = "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted hover:bg-black/5 hover:text-foreground";
 
@@ -123,6 +125,7 @@ function AssignmentCard({ a, zone, risk, onEdit }: { a: Assignment; zone: string
 
       <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-border pt-2">
         <button className={iconBtn} onClick={onEdit}><Pencil size={14} aria-hidden /> Edit</button>
+        <button className={iconBtn} onClick={() => setBreakdown(true)}><ListTree size={14} aria-hidden /> {mine.length ? "Edit steps" : "Break down"}</button>
         <button className={iconBtn} onClick={() => completeAssignment(a.id)}><CheckCircle2 size={14} aria-hidden /> Mark finished</button>
         {confirmDelete ? (
           <span className="ml-auto flex items-center gap-1 text-xs">
@@ -134,6 +137,7 @@ function AssignmentCard({ a, zone, risk, onEdit }: { a: Assignment; zone: string
           <button className={`${iconBtn} ml-auto hover:text-red-700`} onClick={() => setConfirmDelete(true)}><Trash2 size={14} aria-hidden /> Delete</button>
         )}
       </div>
+      {breakdown && <BreakdownPanel assignment={a} onClose={() => setBreakdown(false)} />}
     </article>
   );
 }

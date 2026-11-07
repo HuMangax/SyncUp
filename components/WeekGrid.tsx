@@ -43,7 +43,7 @@ function minutesInDay(iso: string, zone: string, dayKey: string, edge: "start" |
 }
 
 export function WeekGrid() {
-  const { now, events, sessions, assignments, settings, warnings, generatePlan, lastChanged, undo, undoLast } = usePlanner();
+  const { now, events, sessions, assignments, subtasks, settings, warnings, generatePlan, lastChanged, undo, undoLast } = usePlanner();
   const [openSession, setOpenSession] = useState<string | null>(null);
   const [openEvent, setOpenEvent] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -94,7 +94,8 @@ export function WeekGrid() {
       .filter((s: StudySession) => s.status !== "cancelled")
       .forEach((s) => {
         const c = clip(s.start_at, s.end_at);
-        if (c) out.push({ key: s.id, top: c.top, height: c.height, title: titleOf(s.assignment_id), sub: `${fmt(s.start_at)} – ${fmt(s.end_at)}`, kind: "study", pinned: s.pinned, status: s.status, sessionId: s.id });
+        const step = s.subtask_id ? subtasks.find((t) => t.id === s.subtask_id)?.title : undefined;
+        if (c) out.push({ key: s.id, top: c.top, height: c.height, title: titleOf(s.assignment_id), sub: `${step ? `${step}, ` : ""}${fmt(s.start_at)} – ${fmt(s.end_at)}`, kind: "study", pinned: s.pinned, status: s.status, sessionId: s.id });
       });
     return out;
   };
