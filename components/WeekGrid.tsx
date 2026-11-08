@@ -8,7 +8,7 @@ import { usePlanner } from "@/store/planner";
 import { SessionDialog } from "./SessionDialog";
 import { Warnings } from "./Warnings";
 import { AddEventDialog, EventActionsDialog } from "./EventDialog";
-import { GoogleConnect } from "./GoogleConnect";
+import { GoogleConnect, SyncChip } from "./GoogleConnect";
 import { Modal } from "./Modal";
 import { expandEvents } from "@/lib/calendar/simulated";
 import { addDays, localDateKey, localToUtc, mondayOnOrBefore } from "@/lib/time/slots";
@@ -41,7 +41,7 @@ function minutesInDay(iso: string, zone: string, dayKey: string, edge: "start" |
 }
 
 export function WeekGrid() {
-  const { now, events, sessions, assignments, subtasks, settings, warnings, generatePlan, lastChanged, undo, undoLast, syncNote, togglePin, restoreOccurrence, moveSession } = usePlanner();
+  const { now, events, sessions, assignments, subtasks, settings, warnings, generatePlan, lastChanged, undo, undoLast, togglePin, restoreOccurrence, moveSession } = usePlanner();
   const [openSession, setOpenSession] = useState<string | null>(null);
   const [openEvent, setOpenEvent] = useState<{ id: string; startAt: string } | null>(null);
   // Dragging a study block: offset in px, plus the snapped time it would land on.
@@ -166,7 +166,7 @@ export function WeekGrid() {
   };
 
   const renderCol = (dayKey: string) => (
-    <div key={dayKey} data-day={dayKey} className="relative border-l border-border" style={{ height: hours.length * HOUR_H }}>
+    <div key={dayKey} data-day={dayKey} className="relative border-l border-border" style={{ height: hours.length * HOUR_H, "--d": Math.max(0, days.indexOf(dayKey)) } as React.CSSProperties}>
       {hours.map((h, i) => (
         <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: i * HOUR_H }} />
       ))}
@@ -175,7 +175,7 @@ export function WeekGrid() {
         if (m < GRID_START * 60 || m >= GRID_END * 60) return null;
         return (
           <div className="pointer-events-none absolute inset-x-0 z-20 flex items-center" style={{ top: ((m - GRID_START * 60) / 60) * HOUR_H }} aria-hidden>
-            <span className="-ml-1 h-2 w-2 rounded-full bg-red-600" />
+            <span className="now-dot -ml-1 h-2 w-2 rounded-full bg-red-600" />
             <span className="h-px flex-1 bg-red-600" />
           </div>
         );
@@ -185,7 +185,7 @@ export function WeekGrid() {
         const style = KIND_STYLE[b.kind];
         const Icon = style.Icon;
         const isFresh = !!b.sessionId && fresh.has(b.sessionId);
-        const cls = `absolute inset-x-0.5 overflow-hidden rounded-md border-l-4 ${isFresh ? "just-moved z-10" : ""} px-2 py-1 text-left text-xs leading-tight ${
+        const cls = `absolute inset-x-0.5 overflow-hidden rounded-md border-l-4 ${isFresh ? "just-moved z-10" : "block-in"} px-2 py-1 text-left text-xs leading-tight ${
           study ? "border-blue-900 bg-blue-600 text-white shadow-sm hover:bg-blue-700" : style.card
         } ${b.status === "missed" ? "opacity-50 line-through" : ""} ${b.status === "completed" ? "bg-blue-400" : ""}`;
         const body = (
@@ -208,7 +208,7 @@ export function WeekGrid() {
               key={b.key}
               title={`${b.title} · ${b.sub}`}
               aria-label={`${b.title}, ${b.sub}${b.pinned ? ", fixed" : ", movable"}${b.status && b.status !== "scheduled" ? `, ${b.status}` : ""}. ${lockMode ? "Toggle fixed time" : "Open session"}`}
-              className={`${cls} ${canDrag ? "md:cursor-grab md:touch-none" : ""} ${dragging ? "!cursor-grabbing z-40 shadow-xl ring-2 ring-white" : "transition-shadow"}`}
+              className={`${cls} ${canDrag ? "md:cursor-grab md:touch-none" : ""} ${dragging ? "!cursor-grabbing z-40 shadow-xl ring-2 ring-white transition-none" : "transition-shadow"}`}
               style={{ top: b.top, height: b.height, transform: dragging ? `translate(${dragging.dx}px, ${dragging.dy}px)` : undefined }}
               onClick={() => {
                 if (justDragged.current) return;
@@ -231,7 +231,7 @@ export function WeekGrid() {
               key={b.key}
               aria-label={`${b.title}, ${b.sub}, cancelled. Restore`}
               title="Cancelled. Tap to restore."
-              className="absolute inset-x-0.5 overflow-hidden rounded-md border-2 border-dashed border-slate-300 px-2 py-1 text-left text-xs leading-tight text-slate-400 hover:bg-slate-50"
+              className="block-in absolute inset-x-0.5 overflow-hidden rounded-md border-2 border-dashed border-slate-300 px-2 py-1 text-left text-xs leading-tight text-slate-400 hover:bg-slate-50"
               style={{ top: b.top, height: b.height }}
               onClick={() => restoreOccurrence(b.eventId!, b.startAt!)}
             >
@@ -322,6 +322,7 @@ export function WeekGrid() {
       {(["study", "class", "work", "social", "other"] as const).map(chip)}
       <li className="flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800"><Flag size={13} aria-hidden /> Due</li>
       <li className="flex items-center gap-1.5 px-2 text-xs text-muted"><Lock size={13} aria-hidden /> Fixed · <LockOpen size={13} aria-hidden /> Movable</li>
+      <li className="ml-auto"><SyncChip /></li>
     </ul>
   );
 
@@ -332,13 +333,12 @@ export function WeekGrid() {
       <div className="mb-3">
         <Warnings warnings={warnings} compact />
       </div>
-      {toast && <p role="status" className="mb-3 rounded-xl bg-blue-900 px-4 py-2.5 text-sm font-semibold text-white">{toast}</p>}
+      {toast && <p key={toast} role="status" className="toast-in mb-3 rounded-xl bg-blue-900 px-4 py-2.5 text-sm font-semibold text-white">{toast}</p>}
       {lockMode && (
-        <p role="status" className="mb-3 rounded-xl bg-blue-100 px-4 py-2.5 text-sm font-semibold text-blue-900">
+        <p role="status" className="toast-in mb-3 rounded-xl bg-blue-100 px-4 py-2.5 text-sm font-semibold text-blue-900">
           Tap a study block to lock or unlock it. Locked blocks never move.
         </p>
       )}
-      {syncNote && <p role="status" className="mb-3 text-xs text-muted">{syncNote}</p>}
       {openSession && <SessionDialog sessionId={openSession} onClose={() => setOpenSession(null)} />}
       {openEvent && <EventActionsDialog eventId={openEvent.id} startAt={openEvent.startAt} onClose={() => setOpenEvent(null)} />}
       {google && <Modal title="Google Calendar" onClose={() => setGoogle(false)} wide><GoogleConnect /></Modal>}

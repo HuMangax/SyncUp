@@ -4,11 +4,13 @@ import type { CalendarProvider, DateRange } from "./provider";
 /**
  * Google Calendar provider (server-side; needs an OAuth access token).
  * - Reads busy events from the primary calendar. Never writes to it.
- * - Writes study sessions only into a dedicated "Study Planner" calendar, tagged with
+ * - Writes study sessions only into a dedicated "SyncUp" calendar, tagged with
  *   extendedProperties.private.plannerSession = "1" and the session id.
  * - Refuses to modify or delete any event that does not carry that tag.
  */
-export const PLANNER_CALENDAR = "Study Planner";
+export const PLANNER_CALENDAR = "SyncUp";
+/** Name used before the rename. Still recognised so existing users keep one calendar. */
+export const LEGACY_PLANNER_CALENDAR = "Study Planner";
 const API = "https://www.googleapis.com/calendar/v3";
 
 type GEvent = {
@@ -80,7 +82,8 @@ export class GoogleCalendarProvider implements CalendarProvider {
   private async plannerCalendar(): Promise<string> {
     if (this.plannerCalendarId) return this.plannerCalendarId;
     const list = await this.call<{ items?: { id: string; summary: string }[] }>("/users/me/calendarList");
-    const found = list.items?.find((c) => c.summary === PLANNER_CALENDAR);
+    const found =
+      list.items?.find((c) => c.summary === PLANNER_CALENDAR) ?? list.items?.find((c) => c.summary === LEGACY_PLANNER_CALENDAR);
     this.plannerCalendarId = found
       ? found.id
       : (await this.call<{ id: string }>("/calendars", { method: "POST", body: JSON.stringify({ summary: PLANNER_CALENDAR, timeZone: this.timeZone }) })).id;

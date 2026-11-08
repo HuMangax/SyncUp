@@ -1,4 +1,4 @@
-# Adaptive Academic Planner
+# SyncUp
 
 A study planner for university students that adapts to real life. It builds a realistic study schedule around classes, work and social plans. When a student misses a session or falls behind, it recalculates the remaining work and proposes a new plan to review and accept.
 
@@ -72,7 +72,7 @@ Settings then shows **Sign in with Google**. After sign-in the planner loads fro
 2. Add the redirect URI `http(s)://<host>/api/auth/google/callback`.
 3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_TOKEN_SECRET` (any long random string).
 
-Settings then shows **Connect Google Calendar**, then **Import events**. Busy events are only read. Study sessions are written to a separate "Study Planner" calendar, tagged so the planner only ever changes its own events.
+Settings then shows **Connect Google Calendar**, then **Import events**. Busy events are only read. Study sessions are written to a separate "SyncUp" calendar, tagged so the planner only ever changes its own events.
 
 ## Status
 

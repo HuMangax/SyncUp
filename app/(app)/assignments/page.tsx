@@ -126,7 +126,7 @@ function TaskRow({ a, zone, risk, onEdit, onFinish }: { a: Assignment; zone: str
           <span className="mt-0.5 block text-sm text-muted">Due {fmtDue(a.due_at, zone)}</span>
           <span className="mt-2.5 flex items-center gap-3">
             <span className="h-2.5 flex-1 rounded-full bg-blue-100" role="progressbar" aria-label={`${a.title} progress`} aria-valuenow={a.percent_complete} aria-valuemin={0} aria-valuemax={100}>
-              <span className="block h-2.5 rounded-full bg-blue-600 transition-[width] duration-500" style={{ width: `${a.percent_complete}%` }} />
+              <span className="bar block h-2.5 rounded-full bg-blue-600" style={{ width: `${a.percent_complete}%` }} />
             </span>
             <span className="w-10 text-right text-sm font-bold">{a.percent_complete}%</span>
           </span>

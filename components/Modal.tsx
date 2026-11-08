@@ -42,13 +42,13 @@ export function Modal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 p-0 md:items-center md:p-4" onClick={onClose}>
+    <div className="backdrop-in fixed inset-0 z-40 flex items-end justify-center bg-blue-950/40 p-0 backdrop-blur-[2px] md:items-center md:p-4" onClick={onClose}>
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-card p-5 shadow-xl md:rounded-2xl ${wide ? "md:max-w-2xl" : "md:max-w-md"}`}
+        className={`dialog-in max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-card p-5 shadow-xl md:rounded-2xl ${wide ? "md:max-w-2xl" : "md:max-w-md"}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

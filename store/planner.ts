@@ -61,6 +61,9 @@ type Data = {
   googleConnected: boolean;
   /** Result of the last Google sync, shown on the calendar. */
   syncNote: string | null;
+  syncState: "idle" | "syncing" | "ok" | "error";
+  /** Wall-clock time of the last successful sync. Display only. */
+  lastSyncedAt: number | null;
 };
 
 export type PlannerStore = Data & {
@@ -105,6 +108,8 @@ export type PlannerStore = Data & {
   importState: (json: string) => { ok: true } | { ok: false; error: string };
   loadStored: (state: StoredState) => void;
   setGoogleConnected: (connected: boolean) => void;
+  /** Push every upcoming study session to Google Calendar now. */
+  syncGoogleNow: () => Promise<void>;
   importGoogleEvents: (events: EventOccurrence[]) => void;
 };
 
@@ -126,6 +131,8 @@ const initial = (): Data => {
     lastChanged: null,
     googleConnected: false,
     syncNote: null,
+    syncState: "idle",
+    lastSyncedAt: null,
     completedFrom: {},
   };
 };
@@ -161,6 +168,24 @@ export const usePlanner = create<PlannerStore>()(
         const proposals = s.proposals.map((p) => (p.state === "pending" ? { ...p, state: "superseded" as const } : p));
         const p = buildProposal(next, now, trigger, `p-${s.proposals.length + 1}`, prior);
         set({ ...next, now, proposals: [...proposals, p].slice(-20) });
+      };
+
+      /** Best-effort push to Google. Never blocks the caller. Unsynced sessions retry next time. */
+      const pushToGoogle = async (upserts: StudySession[], removes: string[]): Promise<void> => {
+        const s = get();
+        if (!s.googleConnected) return;
+        set({ syncState: "syncing", syncNote: "Syncing to Google Calendar…" });
+        const r = await syncToGoogle(s.settings.timezone, upserts, removes);
+        if ("error" in r) {
+          set({ syncState: "error", syncNote: `Not synced to Google Calendar (${r.error}). Will retry next time.` });
+          return;
+        }
+        set((cur) => ({
+          sessions: cur.sessions.map((x) => (r.synced[x.id] ? { ...x, external_id: r.synced[x.id] } : x)),
+          syncState: r.failed.length ? "error" : "ok",
+          lastSyncedAt: r.failed.length ? cur.lastSyncedAt : Date.now(),
+          syncNote: r.failed.length ? `${r.failed.length} sessions not synced. Will retry next time.` : "Synced to Google Calendar.",
+        }));
       };
 
       return {
@@ -250,20 +275,12 @@ export const usePlanner = create<PlannerStore>()(
             proposals: s.proposals.map((x) => (x.id === p.id ? { ...x, state: "accepted" as const } : x)),
           });
           if (s.googleConnected) {
-            // Best effort: never blocks the accept. Unsynced sessions are retried on the next accept.
             const nowMs = Date.parse(s.now);
             const upserts = data.sessions.filter(
               (x) => x.status === "scheduled" && Date.parse(x.end_at) > nowMs && (changed.includes(x.id) || !x.external_id),
             );
             const removes = p.diff.flatMap((e) => (e.kind === "removed" && e.before?.external_id ? [e.before.external_id] : []));
-            set({ syncNote: "Syncing to Google Calendar…" });
-            void syncToGoogle(s.settings.timezone, upserts, removes).then((r) => {
-              if ("error" in r) return set({ syncNote: `Not synced to Google Calendar (${r.error}). Will retry next time.` });
-              set((cur) => ({
-                sessions: cur.sessions.map((x) => (r.synced[x.id] ? { ...x, external_id: r.synced[x.id] } : x)),
-                syncNote: r.failed.length ? `${r.failed.length} sessions not synced. Will retry next time.` : "Synced to Google Calendar.",
-              }));
-            });
+            void pushToGoogle(upserts, removes);
           }
         },
 
@@ -448,7 +465,14 @@ export const usePlanner = create<PlannerStore>()(
           get().generateWarnings();
         },
 
-        setGoogleConnected: (connected) => set({ googleConnected: connected }),
+        setGoogleConnected: (connected) =>
+          set(connected ? { googleConnected: true } : { googleConnected: false, syncState: "idle", syncNote: null }),
+
+        syncGoogleNow: () => {
+          const s = get();
+          const nowMs = Date.parse(s.now);
+          return pushToGoogle(s.sessions.filter((x) => x.status === "scheduled" && Date.parse(x.end_at) > nowMs), []);
+        },
 
         // Real calendar replaces the seeded simulated one; commitments the student added here stay.
         importGoogleEvents: (occ) => {

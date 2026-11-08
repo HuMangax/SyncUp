@@ -260,7 +260,7 @@ function BeforeAfter({ diff, now, zone, events, title }: { diff: DiffEntry[]; no
 
       {changed.length > 0 && (
         <ul className="mt-5 grid gap-2 md:grid-cols-2">
-          {(showAll ? changed : changed.slice(0, 6)).map((e) => {
+          {(showAll ? changed : changed.slice(0, 6)).map((e, n) => {
             const i = diff.indexOf(e);
             const k = KIND[e.kind];
             return (
@@ -272,7 +272,8 @@ function BeforeAfter({ diff, now, zone, events, title }: { diff: DiffEntry[]; no
                 onFocus={() => setHover(i)}
                 onBlur={() => setHover(null)}
                 title={e.explanation}
-                className="lift flex items-center gap-3 rounded-2xl bg-blue-50 p-3 outline-none ring-blue-400 focus-visible:ring-2"
+                style={{ "--i": n } as React.CSSProperties}
+                className="rise lift flex items-center gap-3 rounded-2xl bg-blue-50 p-3 outline-none ring-blue-400 focus-visible:ring-2"
               >
                 <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${k.tile}`}><k.Icon size={18} aria-label={k.label} /></span>
                 <div className="min-w-0 text-sm">

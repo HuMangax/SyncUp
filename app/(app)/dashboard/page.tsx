@@ -7,6 +7,7 @@ import { usePlanner } from "@/store/planner";
 import { Warnings } from "@/components/Warnings";
 import { OverloadCard } from "@/components/OverloadCard";
 import { RiskChip } from "@/components/RiskChip";
+import { CountUp } from "@/components/CountUp";
 import { KIND_STYLE } from "@/components/kinds";
 import { fmtHours, fmtTime } from "@/components/fmt";
 import { expandEvents } from "@/lib/calendar/simulated";
@@ -66,7 +67,7 @@ export default function HomePage() {
         </header>
 
         {!hasPlan && (
-          <section className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-blue-600 p-6 text-white">
+          <section className="banner-in relative flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 to-blue-800 p-6 text-white shadow-lg shadow-blue-600/20">
             <div>
               <p className="text-xl font-bold">Ready to plan your study time?</p>
               <p className="mt-1 text-blue-100">We’ll fit sessions around your classes and life.</p>
@@ -84,7 +85,7 @@ export default function HomePage() {
         <section aria-label="This week" className="grid grid-cols-2 gap-4 md:grid-cols-3">
           <div style={{ "--i": 0 } as React.CSSProperties} className="rise rounded-3xl bg-white p-6 shadow-sm ring-1 ring-border col-span-2 md:col-span-1">
             <p className="flex items-center gap-2 font-semibold text-muted"><Flag size={18} aria-hidden /> Week progress</p>
-            <p className="mt-2 text-5xl font-extrabold text-blue-700">{overall ?? 0}<span className="text-2xl">%</span></p>
+            <p className="mt-2 text-5xl font-extrabold text-blue-700"><CountUp value={overall ?? 0} /><span className="text-2xl">%</span></p>
             <ul className="mt-4 space-y-2.5">
               {(["assignment", "project", "exam"] as const).map((t) => {
                 const p = pctDone(s.assignments.filter((a) => a.type === t));
@@ -92,7 +93,7 @@ export default function HomePage() {
                   <li key={t} className="text-sm">
                     <div className="flex justify-between font-medium"><span>{TYPE_LABEL[t]}</span><span className="text-muted">{p == null ? "none" : `${p}%`}</span></div>
                     <div className="mt-1 h-2 rounded-full bg-blue-100" role="progressbar" aria-label={TYPE_LABEL[t]} aria-valuenow={p ?? 0} aria-valuemin={0} aria-valuemax={100}>
-                      <div className="h-2 rounded-full bg-blue-600" style={{ width: `${p ?? 0}%` }} />
+                      <div className="bar h-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-700" style={{ width: `${p ?? 0}%` }} />
                     </div>
                   </li>
                 );
@@ -114,12 +115,12 @@ export default function HomePage() {
               <p className="mt-6 rounded-2xl bg-blue-50 p-6 text-center text-muted">Nothing due. <Link href="/syllabus" className="font-semibold text-blue-700 underline">Add a syllabus</Link></p>
             ) : (
               <ul className="mt-4 space-y-3">
-                {active.slice(0, 5).map((a) => {
+                {active.slice(0, 5).map((a, i) => {
                   const due = DateTime.fromISO(a.due_at, { zone: "utc" }).setZone(zone);
                   const days = Math.ceil(due.diff(now, "days").days);
                   const r = s.risk.find((x) => x.assignment_id === a.id);
                   return (
-                    <li key={a.id} className="rounded-2xl bg-blue-50 p-4">
+                    <li key={a.id} style={{ "--i": i } as React.CSSProperties} className="rise lift rounded-2xl bg-blue-50 p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-base font-bold">{a.title}</p>
@@ -128,7 +129,7 @@ export default function HomePage() {
                         {r && r.level !== "on_track" && <RiskChip level={r.level} hoursShort={r.hours_short} />}
                       </div>
                       <div className="mt-2.5 h-2.5 rounded-full bg-white" role="progressbar" aria-label={`${a.title} progress`} aria-valuenow={a.percent_complete} aria-valuemin={0} aria-valuemax={100}>
-                        <div className="h-2.5 rounded-full bg-blue-600" style={{ width: `${a.percent_complete}%` }} />
+                        <div className="bar h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-700" style={{ width: `${a.percent_complete}%` }} />
                       </div>
                       <p className="mt-1.5 text-xs font-medium text-muted">{a.percent_complete}% done · {fmtHours(remainingHours(a))} left</p>
                     </li>
@@ -147,11 +148,11 @@ export default function HomePage() {
               <p className="mt-6 rounded-2xl bg-blue-50 p-6 text-center text-muted">No events this week.</p>
             ) : (
               <ul className="mt-4 space-y-3">
-                {upcomingEvents.map((o) => {
+                {upcomingEvents.map((o, i) => {
                   const k = KIND_STYLE[o.kind];
                   const st = DateTime.fromISO(o.start_at, { zone: "utc" }).setZone(zone);
                   return (
-                    <li key={o.event_id + o.start_at} className="lift flex items-center gap-3 rounded-2xl bg-blue-50 p-4">
+                    <li key={o.event_id + o.start_at} style={{ "--i": i } as React.CSSProperties} className="rise lift flex items-center gap-3 rounded-2xl bg-blue-50 p-4">
                       <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${k.chip}`}><k.Icon size={20} aria-hidden /></span>
                       <div className="min-w-0">
                         <p className="truncate text-base font-bold">{o.title}</p>
@@ -186,7 +187,7 @@ function Stat({ icon, label, value, note, tone, i }: { icon: React.ReactNode; la
   return (
     <div style={{ "--i": i } as React.CSSProperties} className={`rise rounded-3xl p-5 shadow-sm md:p-6 ${tone}`}>
       <p className="flex items-center gap-2 font-semibold opacity-80">{icon} {label}</p>
-      <p className="mt-2 text-5xl font-extrabold">{value}</p>
+      <p className="mt-2 text-5xl font-extrabold"><CountUp value={value} /></p>
       <p className="mt-2 text-sm opacity-80">{note}</p>
     </div>
   );

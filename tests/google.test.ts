@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { GoogleCalendarProvider, PLANNER_CALENDAR } from "@/lib/calendar/google";
+import { GoogleCalendarProvider, LEGACY_PLANNER_CALENDAR, PLANNER_CALENDAR } from "@/lib/calendar/google";
 import { decryptToken, encryptToken } from "@/lib/server/crypto";
 import type { StudySession } from "@/lib/types";
 
 type Call = { method: string; url: string; body?: unknown };
 
 /** Minimal fake of the Google Calendar v3 API. */
-function fakeGoogle(opts: { hasPlannerCalendar?: boolean } = {}) {
+function fakeGoogle(opts: { hasPlannerCalendar?: boolean; calendarName?: string } = {}) {
   const calls: Call[] = [];
   const events: Record<string, Record<string, unknown>> = {
     "ours-1": { id: "ours-1", extendedProperties: { private: { plannerSession: "1", sessionId: "s-1" } } },
@@ -19,7 +19,7 @@ function fakeGoogle(opts: { hasPlannerCalendar?: boolean } = {}) {
     calls.push({ method, url, body });
     const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json" } });
     if (url.includes("/users/me/calendarList")) {
-      return json({ items: opts.hasPlannerCalendar ? [{ id: "planner-cal", summary: PLANNER_CALENDAR }] : [{ id: "primary", summary: "Me" }] });
+      return json({ items: opts.hasPlannerCalendar ? [{ id: "planner-cal", summary: opts.calendarName ?? PLANNER_CALENDAR }] : [{ id: "primary", summary: "Me" }] });
     }
     if (url.endsWith("/calendars") && method === "POST") return json({ id: "planner-cal", summary: PLANNER_CALENDAR });
     if (url.includes("/calendars/primary/events") && method === "GET") {
@@ -63,7 +63,7 @@ describe("GoogleCalendarProvider", () => {
     expect(g.calls.every((c) => c.method === "GET")).toBe(true); // reading never writes
   });
 
-  it("creates the Study Planner calendar if needed and tags new sessions", async () => {
+  it("creates the SyncUp calendar if needed and tags new sessions", async () => {
     const g = fakeGoogle({ hasPlannerCalendar: false });
     const p = new GoogleCalendarProvider("token", "America/Vancouver", g.fetchImpl);
     const { externalId } = await p.upsertSession(session);
@@ -73,6 +73,14 @@ describe("GoogleCalendarProvider", () => {
     const insert = g.calls.find((c) => c.method === "POST" && c.url.includes("/planner-cal/events"));
     expect(insert?.body).toMatchObject({ extendedProperties: { private: { plannerSession: "1", sessionId: "s-9" } } });
     expect(g.calls.some((c) => c.url.includes("/calendars/primary/") && c.method !== "GET")).toBe(false);
+  });
+
+  it("reuses a calendar made before the SyncUp rename instead of creating a second one", async () => {
+    const g = fakeGoogle({ hasPlannerCalendar: true, calendarName: LEGACY_PLANNER_CALENDAR });
+    const p = new GoogleCalendarProvider("token", "America/Vancouver", g.fetchImpl);
+    await p.upsertSession(session);
+    expect(g.calls.some((c) => c.method === "POST" && c.url.endsWith("/calendars"))).toBe(false);
+    expect(g.calls.some((c) => c.method === "POST" && c.url.includes("/planner-cal/events"))).toBe(true);
   });
 
   it("updates a tagged event in place", async () => {

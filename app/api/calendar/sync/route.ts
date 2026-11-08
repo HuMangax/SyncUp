@@ -18,7 +18,7 @@ const Session = z.object({
 });
 const Body = z.object({ tz: z.string().min(1), upserts: z.array(Session).max(200), removes: z.array(z.string()).max(200) });
 
-/** Push accepted study sessions to the "Study Planner" calendar. Only ever touches tagged events. */
+/** Push accepted study sessions to the "SyncUp" calendar. Only ever touches tagged events. */
 export async function POST(request: Request) {
   const body = Body.safeParse(await request.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: "Invalid sync request." }, { status: 400 });

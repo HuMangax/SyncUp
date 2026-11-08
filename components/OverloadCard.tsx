@@ -49,7 +49,7 @@ export function OverloadCard() {
           <span>{o.available_hours} h free</span>
         </div>
         <div className="relative mt-1 h-3.5 overflow-hidden rounded-full bg-white/80">
-          <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, (o.available_hours / Math.max(o.needed_hours, o.available_hours)) * 100)}%` }} />
+          <div className="bar h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, (o.available_hours / Math.max(o.needed_hours, o.available_hours)) * 100)}%` }} />
           {over && (
             <div className="absolute inset-y-0 right-0 bg-red-500" style={{ width: `${Math.max(0, 100 - (o.available_hours / o.needed_hours) * 100)}%` }} aria-hidden />
           )}
