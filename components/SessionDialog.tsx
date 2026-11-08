@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, CircleDashed, Pin, PinOff, X, XCircle } from "lucide-react";
+import { Check, CircleDashed, Lock, LockOpen, X, XCircle } from "lucide-react";
 import { usePlanner } from "@/store/planner";
 import { fmtRange } from "./fmt";
 
@@ -34,7 +34,7 @@ export function SessionDialog({ sessionId, onClose }: { sessionId: string; onClo
         role="dialog"
         aria-modal="true"
         aria-labelledby="session-title"
-        className="w-full max-w-sm rounded-2xl bg-card p-5 shadow-xl"
+        className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-start justify-between gap-2">
@@ -47,10 +47,10 @@ export function SessionDialog({ sessionId, onClose }: { sessionId: string; onClo
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <button ref={first} className={`${btn} bg-emerald-600 text-white hover:bg-emerald-700`} onClick={act(() => markSession(s.id, "completed"))}>
+          <button ref={first} className={`${btn} bg-blue-600 text-white hover:bg-blue-700`} onClick={act(() => markSession(s.id, "completed"))}>
             <Check size={16} aria-hidden /> Done
           </button>
-          <button className={`${btn} border border-border bg-white hover:bg-black/5`} onClick={act(() => markSession(s.id, "missed"))}>
+          <button className={`${btn} border border-border bg-white hover:bg-blue-50`} onClick={act(() => markSession(s.id, "missed"))}>
             <XCircle size={16} aria-hidden /> Missed
           </button>
         </div>
@@ -73,11 +73,23 @@ export function SessionDialog({ sessionId, onClose }: { sessionId: string; onClo
           </button>
         </div>
 
-        <button className={`${btn} mt-2 w-full text-accent hover:bg-accent-soft`} onClick={act(() => togglePin(s.id))}>
-          {s.pinned ? <PinOff size={16} aria-hidden /> : <Pin size={16} aria-hidden />}
-          {s.pinned ? "Unpin (let the planner move it)" : "Pin to this time"}
-        </button>
-        <p className="mt-3 text-xs text-muted">Changes don’t overwrite your plan. You’ll review the new schedule before it’s applied.</p>
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-blue-50 p-3">
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            {s.pinned ? <Lock size={16} aria-hidden /> : <LockOpen size={16} aria-hidden />}
+            Keep at this time
+          </span>
+          <button
+            role="switch"
+            aria-checked={s.pinned}
+            aria-label="Keep this session at this time"
+            onClick={act(() => togglePin(s.id))}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${s.pinned ? "bg-blue-600" : "bg-slate-300"}`}
+          >
+            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${s.pinned ? "left-[1.4rem]" : "left-0.5"}`} />
+          </button>
+        </div>
+        <p className="mt-1.5 px-1 text-xs text-muted">{s.pinned ? "The planner won’t move it." : "The planner may move it."}</p>
+        <p className="mt-3 text-xs text-muted">Your plan only changes after you review it.</p>
       </div>
     </div>
   );

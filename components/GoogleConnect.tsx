@@ -14,10 +14,8 @@ export function GoogleConnect() {
   const { now, settings, setGoogleConnected, importGoogleEvents } = usePlanner();
   const [status, setStatus] = useState<Status>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const demo = process.env.NEXT_PUBLIC_DEMO === "1";
 
   useEffect(() => {
-    if (demo) return;
     fetch("/api/calendar?status=1")
       .then((r) => r.json())
       .then((s: Status) => {
@@ -25,7 +23,7 @@ export function GoogleConnect() {
         setGoogleConnected(!!s?.connected);
       })
       .catch(() => setStatus({ configured: false, connected: false }));
-  }, [demo, setGoogleConnected]);
+  }, [setGoogleConnected]);
 
   const importNow = async () => {
     setMsg("Reading your Google Calendar…");
@@ -45,31 +43,45 @@ export function GoogleConnect() {
   };
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="gcal-h">
-      <h2 id="gcal-h" className="flex items-center gap-1.5 text-sm font-semibold">
-        <CalendarDays size={16} aria-hidden /> Google Calendar
+    <section className="rounded-3xl bg-card p-6 shadow-sm ring-1 ring-border" aria-labelledby="gcal-h">
+      <h2 id="gcal-h" className="flex items-center gap-2 text-xl font-bold">
+        <CalendarDays size={22} aria-hidden /> Google Calendar
       </h2>
-      {demo ? (
-        <p className="mt-1 text-sm text-muted">Demo mode uses a simulated calendar, so Google Calendar is off.</p>
-      ) : !status ? (
-        <p className="mt-1 text-sm text-muted">Checking…</p>
+      {!status ? (
+        <p className="mt-2 text-sm text-muted">Checking…</p>
       ) : !status.configured ? (
-        <p className="mt-1 text-sm text-muted">Google Calendar isn’t set up on this server yet.</p>
+        <div className="mt-2 space-y-3 text-sm">
+          <p className="text-muted">Google Calendar isn’t set up yet. This takes a few minutes, once:</p>
+          <ol className="list-decimal space-y-1.5 pl-5">
+            <li>In Google Cloud, create an OAuth client (type: web app) and turn on the Google Calendar API.</li>
+            <li>
+              Add this redirect URL:{" "}
+              <code className="break-all rounded bg-blue-50 px-1.5 py-0.5 text-xs font-semibold">
+                {typeof window === "undefined" ? "" : `${window.location.origin}/api/auth/google/callback`}
+              </code>
+            </li>
+            <li>
+              Put <code className="rounded bg-blue-50 px-1 text-xs font-semibold">GOOGLE_CLIENT_ID</code>,{" "}
+              <code className="rounded bg-blue-50 px-1 text-xs font-semibold">GOOGLE_CLIENT_SECRET</code> and a long random{" "}
+              <code className="rounded bg-blue-50 px-1 text-xs font-semibold">GOOGLE_TOKEN_SECRET</code> in <code className="rounded bg-blue-50 px-1 text-xs font-semibold">.env.local</code>, then restart.
+            </li>
+          </ol>
+          <p className="text-muted">Until then the planner uses its built-in calendar.</p>
+        </div>
       ) : status.connected ? (
         <>
-          <p className="mt-1 text-sm text-muted">
-            Connected. Your events are only read. Study sessions go into a separate “Study Planner” calendar, and the planner
-            never changes anything else.
+          <p className="mt-2 text-sm text-muted">
+            Connected. We only read your events. Study sessions go in a separate “Study Planner” calendar.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={importNow} className={secondaryBtn}>Import events</button>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" onClick={importNow} className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700">Import my events</button>
             <button type="button" onClick={disconnect} className={secondaryBtn}>Disconnect</button>
           </div>
         </>
       ) : (
         <>
-          <p className="mt-1 text-sm text-muted">Bring in your classes, shifts and plans so study time fits around them.</p>
-          <a href="/api/auth/google" className={`${secondaryBtn} mt-3 inline-block`}>Connect Google Calendar</a>
+          <p className="mt-2 text-sm text-muted">Bring in your classes, shifts and plans so study time fits around them.</p>
+          <a href="/api/auth/google" className="mt-4 inline-block rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700">Connect Google Calendar</a>
         </>
       )}
       {msg && <p role="status" className="mt-2 text-sm text-muted">{msg}</p>}

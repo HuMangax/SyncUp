@@ -63,7 +63,7 @@ export function Modal({
   );
 }
 
-export const field = "mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground";
+export const field = "mt-1 w-full rounded-xl border border-border bg-white px-3.5 py-2.5 text-sm text-foreground";
 export const labelCls = "block text-sm font-medium";
-export const primaryBtn = "rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50";
-export const secondaryBtn = "rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium hover:bg-black/5";
+export const primaryBtn = "rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50";
+export const secondaryBtn = "rounded-xl border border-border bg-white px-5 py-2.5 text-sm font-semibold hover:bg-blue-50";

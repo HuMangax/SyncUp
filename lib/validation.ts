@@ -127,6 +127,7 @@ const EventSchema = z.object({
   rule: z
     .object({ days: z.array(z.number().int().min(0).max(6)), start: hm, end: hm, from: z.string().optional(), until: z.string().optional() })
     .optional(),
+  skip: z.array(iso).optional(),
   read_only: z.literal(true),
 });
 const SubtaskSchema = z.object({

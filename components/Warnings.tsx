@@ -16,7 +16,7 @@ export function Warnings({ warnings, compact = false }: { warnings: Warning[]; c
   return (
     <div className="space-y-2">
       {red.length > 0 && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-base text-red-900">
           {red.map((w, i) => (
             <p key={i} className="flex items-start gap-2">
               <OctagonAlert size={16} className="mt-0.5 shrink-0" aria-hidden />

@@ -57,3 +57,18 @@ export function applySessionStatus(
   });
   return { ...data, sessions, assignments };
 }
+
+/**
+ * Tick or untick one breakdown step. The assignment's percent then follows its steps
+ * (hours-weighted), so finishing a step moves the progress bar.
+ */
+export function applyStepDone(data: PlanData, subtaskId: string, done: boolean): PlanData {
+  const step = data.subtasks.find((t) => t.id === subtaskId);
+  if (!step) return data;
+  const subtasks = data.subtasks.map((t) => (t.id === subtaskId ? { ...t, percent_complete: done ? 100 : 0 } : t));
+  const mine = subtasks.filter((t) => t.assignment_id === step.assignment_id);
+  const total = mine.reduce((h, t) => h + t.estimate_hours, 0);
+  const pct = total === 0 ? 0 : mine.reduce((h, t) => h + t.estimate_hours * t.percent_complete, 0) / total;
+  const assignments = data.assignments.map((a) => (a.id === step.assignment_id ? setPercent(a, pct) : a));
+  return { ...data, subtasks, assignments };
+}

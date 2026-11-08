@@ -94,6 +94,8 @@ export type CalendarEvent = {
   start_at: ISO;
   end_at: ISO;
   rule?: WeeklyRule;
+  /** Start times of occurrences the student cancelled (a lecture that was called off). The event itself is never changed. */
+  skip?: ISO[];
   /** Always true. Existing events are never modified or deleted by the planner. */
   read_only: true;
 };
@@ -105,6 +107,8 @@ export type EventOccurrence = {
   kind: EventKind;
   start_at: ISO;
   end_at: ISO;
+  /** Only present when the caller asked for cancelled occurrences too. */
+  cancelled?: boolean;
 };
 
 // ---------- Sessions ----------

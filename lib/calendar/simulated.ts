@@ -7,17 +7,27 @@ import type { CalendarProvider, DateRange } from "./provider";
  * Weekly rules are expanded by LOCAL wall-clock time and then converted to UTC,
  * so a 9:00 class stays 9:00 across DST changes.
  */
-export function expandEvents(events: CalendarEvent[], range: DateRange, zone: string): EventOccurrence[] {
+export function expandEvents(
+  events: CalendarEvent[],
+  range: DateRange,
+  zone: string,
+  opts: { includeCancelled?: boolean } = {},
+): EventOccurrence[] {
   const fromMs = Date.parse(range.from);
   const toMs = Date.parse(range.to);
   const out: EventOccurrence[] = [];
 
   for (const ev of events) {
+    const skipped = new Set(ev.skip ?? []);
+    const add = (o: EventOccurrence) => {
+      if (!skipped.has(o.start_at)) out.push(o);
+      else if (opts.includeCancelled) out.push({ ...o, cancelled: true });
+    };
     if (!ev.rule) {
       const s = Date.parse(ev.start_at);
       const e = Date.parse(ev.end_at);
       if (e > fromMs && s < toMs) {
-        out.push({ event_id: ev.id, title: ev.title, kind: ev.kind, start_at: ev.start_at, end_at: ev.end_at });
+        add({ event_id: ev.id, title: ev.title, kind: ev.kind, start_at: ev.start_at, end_at: ev.end_at });
       }
       continue;
     }
@@ -34,7 +44,7 @@ export function expandEvents(events: CalendarEvent[], range: DateRange, zone: st
           end_at = localToUtc(addDays(day, 1), rule.end, zone); // crosses midnight
         }
         if (Date.parse(end_at) > fromMs && Date.parse(start_at) < toMs) {
-          out.push({ event_id: ev.id, title: ev.title, kind: ev.kind, start_at, end_at });
+          add({ event_id: ev.id, title: ev.title, kind: ev.kind, start_at, end_at });
         }
       }
       day = addDays(day, 1);

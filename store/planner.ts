@@ -20,10 +20,12 @@ import type {
 } from "@/lib/types";
 import { createSeed, demoAnchorFor } from "@/lib/demo/seed";
 import { markNextMissed, squeezeWeek, surpriseShift } from "@/lib/demo/controls";
+import { expandEvents } from "@/lib/calendar/simulated";
+import { validateMove } from "@/lib/calendar/move";
 import { syncToGoogle } from "@/lib/calendar/sync-client";
 import type { StoredState } from "@/lib/repo/rows";
 import { acceptProposal, buildProposal, currentRisk, generateInitial, undoAccept } from "@/lib/progress/proposal";
-import { applySessionStatus, remainingHours, setPercent, setRemaining } from "@/lib/progress/remaining";
+import { applySessionStatus, applyStepDone, remainingHours, setPercent, setRemaining } from "@/lib/progress/remaining";
 import {
   assignmentFromInput,
   eventFromInput,
@@ -53,6 +55,8 @@ type Data = {
   risk: RiskEntry[];
   /** Sessions added or moved by the last accept, so the calendar can show what changed. */
   lastChanged: { ids: string[]; at: number } | null;
+  /** Progress an assignment had just before it was finished, so finishing can be undone. */
+  completedFrom: Record<string, number>;
   /** Google Calendar is connected (set by Settings after checking the server). */
   googleConnected: boolean;
   /** Result of the last Google sync, shown on the calendar. */
@@ -78,10 +82,23 @@ export type PlannerStore = Data & {
   demoSurpriseShift: () => void;
   demoSqueezeWeek: () => void;
   addAssignment: (input: AssignmentInput) => void;
+  /** Add several at once (e.g. from a syllabus) as a single proposal. */
+  addAssignments: (inputs: AssignmentInput[]) => void;
   updateAssignment: (id: string, input: AssignmentInput) => void;
   deleteAssignment: (id: string) => void;
   completeAssignment: (id: string) => void;
+  /** Undo "finished": back to the progress it had before. */
+  reopenAssignment: (id: string) => void;
   setSubtasks: (assignmentId: string, subtasks: Subtask[]) => void;
+  /** Tick or untick a breakdown step; the assignment percent follows. */
+  toggleStep: (subtaskId: string, done: boolean) => void;
+  /** Re-run the planner over the current state and open a proposal to review. */
+  replan: () => void;
+  /** Cancel one occurrence of a calendar event (e.g. a lecture called off). Never edits the event. */
+  cancelOccurrence: (eventId: string, startAt: string) => void;
+  restoreOccurrence: (eventId: string, startAt: string) => void;
+  /** Drag a study session to a new time. Pins it there. Returns why it was refused, if it was. */
+  moveSession: (sessionId: string, startIso: string) => { ok: true } | { ok: false; reason: string };
   addEvent: (input: EventInput) => void;
   deleteEvent: (id: string) => void;
   exportState: () => string;
@@ -109,6 +126,7 @@ const initial = (): Data => {
     lastChanged: null,
     googleConnected: false,
     syncNote: null,
+    completedFrom: {},
   };
 };
 
@@ -179,12 +197,16 @@ export const usePlanner = create<PlannerStore>()(
 
         setProgress: (assignmentId, change) => {
           const s = get();
+          const before = s.assignments.find((x) => x.id === assignmentId);
           const assignments = s.assignments.map((a) => {
             if (a.id !== assignmentId) return a;
             if (change.remaining != null) return setRemaining(a, change.remaining);
             if (change.percent != null) return setPercent(a, change.percent);
             return a;
           });
+          if (before && before.status !== "completed" && (change.percent ?? 0) >= 100) {
+            set({ completedFrom: { ...s.completedFrom, [assignmentId]: before.percent_complete } });
+          }
           propose(
             { ...planData(s), assignments },
             { type: "progress", assignment_id: assignmentId, percent: change.percent, remaining_hours: change.remaining },
@@ -289,6 +311,16 @@ export const usePlanner = create<PlannerStore>()(
           propose({ ...planData(s), assignments: [...s.assignments, a] }, { type: "assignment_change" });
         },
 
+        addAssignments: (inputs) => {
+          if (inputs.length === 0) return;
+          const s = get();
+          const added: Assignment[] = [];
+          for (const input of inputs) {
+            added.push(assignmentFromInput(input, s.settings.timezone, nextId("a-user", [...s.assignments, ...added])));
+          }
+          propose({ ...planData(s), assignments: [...s.assignments, ...added] }, { type: "assignment_change" });
+        },
+
         updateAssignment: (id, input) => {
           const s = get();
           const old = s.assignments.find((a) => a.id === id);
@@ -311,12 +343,74 @@ export const usePlanner = create<PlannerStore>()(
 
         completeAssignment: (id) => get().setProgress(id, { percent: 100 }),
 
+        reopenAssignment: (id) => {
+          const s = get();
+          const a = s.assignments.find((x) => x.id === id);
+          if (!a) return;
+          const steps = s.subtasks.filter((t) => t.assignment_id === id);
+          const stepPct = steps.length ? (steps.reduce((h, t) => h + t.estimate_hours * t.percent_complete, 0) / steps.reduce((h, t) => h + t.estimate_hours, 0)) : 0;
+          const back = Math.min(95, s.completedFrom[id] ?? stepPct);
+          const { [id]: _drop, ...rest } = s.completedFrom;
+          void _drop;
+          set({ completedFrom: rest });
+          get().setProgress(id, { percent: back });
+        },
+
         setSubtasks: (assignmentId, subtasks) => {
           const s = get();
           propose(
             { ...planData(s), subtasks: [...s.subtasks.filter((t) => t.assignment_id !== assignmentId), ...subtasks] },
             { type: "assignment_change" },
           );
+        },
+
+        replan: () => {
+          const s = get();
+          propose(planData(s), { type: "clock" });
+        },
+
+        toggleStep: (subtaskId, done) => {
+          const s = get();
+          const step = s.subtasks.find((t) => t.id === subtaskId);
+          if (!step) return;
+          const next = applyStepDone(planData(s), subtaskId, done);
+          const a = next.assignments.find((x) => x.id === step.assignment_id);
+          const was = s.assignments.find((x) => x.id === step.assignment_id);
+          if (was && was.status !== "completed" && a?.status === "completed") {
+            // Undoing the last step later should reopen at the progress before it.
+            set({ completedFrom: { ...s.completedFrom, [step.assignment_id]: was.percent_complete } });
+          }
+          propose(next, { type: "progress", assignment_id: step.assignment_id, percent: a?.percent_complete });
+        },
+
+        cancelOccurrence: (eventId, startAt) => {
+          const s = get();
+          const events = s.events.map((e) => (e.id === eventId && !(e.skip ?? []).includes(startAt) ? { ...e, skip: [...(e.skip ?? []), startAt] } : e));
+          propose({ ...planData(s), events }, { type: "calendar_change" });
+        },
+
+        restoreOccurrence: (eventId, startAt) => {
+          const s = get();
+          const events = s.events.map((e) => (e.id === eventId ? { ...e, skip: (e.skip ?? []).filter((x) => x !== startAt) } : e));
+          propose({ ...planData(s), events }, { type: "calendar_change" });
+        },
+
+        moveSession: (sessionId, startIso) => {
+          const s = get();
+          const x = s.sessions.find((v) => v.id === sessionId);
+          if (!x) return { ok: false, reason: "That session no longer exists." };
+          const t = Date.parse(startIso);
+          const occurrences = expandEvents(s.events, { from: new Date(t - 864e5).toISOString(), to: new Date(t + 2 * 864e5).toISOString() }, s.settings.timezone);
+          const check = validateMove(x, startIso, { now: s.now, settings: s.settings, occurrences, sessions: s.sessions });
+          if (!check.ok) return check;
+          const len = Date.parse(x.end_at) - Date.parse(x.start_at);
+          set({
+            sessions: s.sessions.map((v) => (v.id === sessionId ? { ...v, start_at: startIso, end_at: new Date(t + len).toISOString(), pinned: true } : v)),
+            // A pending proposal was built before this move; drop it so it can't undo the drag.
+            proposals: s.proposals.map((p) => (p.state === "pending" ? { ...p, state: "superseded" as const } : p)),
+          });
+          get().generateWarnings();
+          return { ok: true };
         },
 
         addEvent: (input) => {

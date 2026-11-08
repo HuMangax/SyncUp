@@ -11,7 +11,7 @@ export type Rows = {
   user_settings: UserSettings & { user_id: string };
   assignments: (Assignment & { user_id: string })[];
   subtasks: (Subtask & { user_id: string })[];
-  calendar_events: (Omit<CalendarEvent, "rule" | "external_id"> & { user_id: string; rule: CalendarEvent["rule"] | null; external_id: string | null })[];
+  calendar_events: (Omit<CalendarEvent, "rule" | "external_id" | "skip"> & { user_id: string; rule: CalendarEvent["rule"] | null; external_id: string | null; skip: string[] | null })[];
   study_sessions: (Omit<StudySession, "external_id"> & { user_id: string; external_id: string | null })[];
 };
 
@@ -28,7 +28,7 @@ export function toRows(s: StoredState, userId: string): Rows {
     user_settings: { ...u, ...s.settings },
     assignments: s.assignments.map((a) => ({ ...u, ...a })),
     subtasks: s.subtasks.map((t) => ({ ...u, ...t })),
-    calendar_events: s.events.map((e) => ({ ...u, ...e, rule: e.rule ?? null, external_id: e.external_id ?? null })),
+    calendar_events: s.events.map((e) => ({ ...u, ...e, rule: e.rule ?? null, external_id: e.external_id ?? null, skip: e.skip?.length ? e.skip : null })),
     study_sessions: s.sessions.map((x) => ({ ...u, ...x, external_id: x.external_id ?? null })),
   };
 }
@@ -42,8 +42,8 @@ export function fromRows(r: Rows): StoredState {
     assignments: r.assignments.map(strip),
     subtasks: r.subtasks.map(strip),
     events: r.calendar_events.map((row) => {
-      const { rule, external_id, ...e } = strip(row);
-      return { ...e, ...(rule ? { rule } : {}), ...(external_id ? { external_id } : {}) } as CalendarEvent;
+      const { rule, external_id, skip, ...e } = strip(row);
+      return { ...e, ...(rule ? { rule } : {}), ...(external_id ? { external_id } : {}), ...(skip?.length ? { skip } : {}) } as CalendarEvent;
     }),
     sessions: r.study_sessions.map((row) => {
       const { external_id, ...x } = strip(row);

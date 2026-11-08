@@ -59,8 +59,8 @@ export function AccountPanel() {
   }, [sb]);
   if (!sb) return null;
   return (
-    <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="acct-h">
-      <h2 id="acct-h" className="text-sm font-semibold">Account</h2>
+    <section className="rounded-3xl bg-card p-6 shadow-sm ring-1 ring-border" aria-labelledby="acct-h">
+      <h2 id="acct-h" className="text-xl font-bold">Account</h2>
       {user ? (
         <>
           <p className="mt-1 text-sm text-muted">Signed in as {user.email}. Your planner is saved to your account.</p>
